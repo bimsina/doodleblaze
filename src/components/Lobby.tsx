@@ -1,33 +1,65 @@
 import { useState } from 'react'
 import {
+  Bicycle,
   Cards,
   Check,
   Crown,
+  FishSimple,
+  Ghost,
   Hamburger,
+  HandWaving,
   HourglassMedium,
   Lamp,
   LinkSimple,
+  MagicWand,
+  MusicNotes,
+  NotePencil,
   PawPrint,
+  Planet,
   Play,
   Plus,
   Shuffle,
+  SoccerBall,
   Target,
   Timer,
+  Tree,
+  TShirt,
+  Wrench,
 } from '@phosphor-icons/react'
 import type { Icon } from '@phosphor-icons/react'
 import { Avatar } from '#/components/Avatar'
 import { Band, Body, RoomTop } from '#/components/Poster'
 import { RestingNote } from '#/components/RoomChrome'
 import { MAX_PLAYERS, ROUND_MS, TOTAL_ROUNDS } from '#/shared/protocol'
-import { PACKS } from '#/shared/prompts'
+import {
+  CUSTOM_PACK,
+  MAX_WORD_LENGTH,
+  MIN_CUSTOM_WORDS,
+  PACKS,
+  parseWords,
+} from '#/shared/prompts'
 import type { RoomConnection } from '#/lib/useRoom'
 
-const PACK_ICONS: Record<string, Icon> = {
+const PACK_ICONS: Record<string, Icon | undefined> = {
   mixed: Shuffle,
   animals: PawPrint,
+  sea: FishSimple,
   food: Hamburger,
   objects: Lamp,
+  vehicles: Bicycle,
+  outdoors: Tree,
+  sports: SoccerBall,
+  wardrobe: TShirt,
+  music: MusicNotes,
+  fantasy: MagicWand,
+  scifi: Planet,
+  spooky: Ghost,
+  body: HandWaving,
+  tools: Wrench,
 }
+
+/** The host's last list, kept on this device so the next room starts with it. */
+const DRAFT_KEY = 'doodleblaze:words'
 
 export function Lobby({ room }: { room: RoomConnection }) {
   const state = room.state!
@@ -36,6 +68,8 @@ export function Lobby({ room }: { room: RoomConnection }) {
   const isHost = !!me?.host
   const connected = state.players.filter((p) => p.connected)
   const [copied, setCopied] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const hasCustom = state.customWords >= MIN_CUSTOM_WORDS
 
   const invite = async () => {
     const url = `${location.origin}/r/${state.code}`
@@ -88,41 +122,42 @@ export function Lobby({ room }: { room: RoomConnection }) {
             </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {PACKS.map((pack) => {
-              const selected = state.pack === pack.id
-              const PackIcon = PACK_ICONS[pack.id]
-              return (
-                <button
-                  key={pack.id}
-                  disabled={!isHost}
-                  aria-pressed={selected}
-                  onClick={() => room.send({ t: 'pack', pack: pack.id })}
-                  className={`flex flex-col gap-2.5 rounded-2xl p-3.5 text-left transition-colors disabled:cursor-default sm:p-4 ${
-                    selected
-                      ? 'bg-ink text-white'
-                      : 'bg-paper-deep enabled:hover:bg-line'
-                  } ${!isHost && !selected ? 'opacity-55' : ''}`}
-                >
-                  <span
-                    className={`flex size-10 items-center justify-center rounded-xl ${selected ? 'bg-sun text-ink' : 'bg-white text-ink-soft'}`}
-                  >
-                    <PackIcon
-                      className="size-5"
-                      weight={selected ? 'fill' : 'bold'}
-                    />
-                  </span>
-                  <span>
-                    <span className="block font-bold">{pack.name}</span>
-                    <span
-                      className={`block text-sm leading-snug ${selected ? 'text-white/65' : 'text-ink-faint'}`}
-                    >
-                      {pack.blurb}
-                    </span>
-                  </span>
-                </button>
-              )
-            })}
+            {PACKS.map((pack) => (
+              <PackCard
+                key={pack.id}
+                icon={PACK_ICONS[pack.id] ?? Cards}
+                name={pack.name}
+                blurb={pack.blurb}
+                selected={state.pack === pack.id}
+                isHost={isHost}
+                onClick={() => {
+                  setEditing(false)
+                  room.send({ t: 'pack', pack: pack.id })
+                }}
+              />
+            ))}
+            <PackCard
+              icon={NotePencil}
+              name={isHost ? 'Your words' : 'Host’s words'}
+              blurb={
+                hasCustom
+                  ? `${state.customWords} secret words`
+                  : isHost
+                    ? 'Write your own list'
+                    : 'Written by the host'
+              }
+              selected={state.pack === CUSTOM_PACK}
+              isHost={isHost}
+              expanded={isHost ? editing : undefined}
+              onClick={() => {
+                if (hasCustom) room.send({ t: 'pack', pack: CUSTOM_PACK })
+                setEditing((open) => !open)
+              }}
+            />
           </div>
+          {isHost && editing && (
+            <WordsEditor room={room} onClose={() => setEditing(false)} />
+          )}
         </section>
 
         {/* On phones the start button rides along at the bottom of the screen. */}
@@ -159,6 +194,137 @@ export function Lobby({ room }: { room: RoomConnection }) {
       </Body>
     </>
   )
+}
+
+function PackCard({
+  icon: PackIcon,
+  name,
+  blurb,
+  selected,
+  isHost,
+  expanded,
+  onClick,
+}: {
+  icon: Icon
+  name: string
+  blurb: string
+  selected: boolean
+  isHost: boolean
+  expanded?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      disabled={!isHost}
+      aria-pressed={selected}
+      aria-expanded={expanded}
+      onClick={onClick}
+      className={`flex flex-col items-start rounded-2xl p-3 text-left transition-colors disabled:cursor-default sm:p-4 ${
+        selected ? 'bg-ink text-white' : 'bg-paper-deep enabled:hover:bg-line'
+      } ${!isHost && !selected ? 'opacity-55' : ''}`}
+    >
+      <span
+        className={`mb-2 flex size-8 items-center justify-center rounded-lg sm:mb-2.5 sm:size-10 sm:rounded-xl ${selected ? 'bg-sun text-ink' : 'bg-white text-ink-soft'}`}
+      >
+        <PackIcon
+          className="size-4 sm:size-5"
+          weight={selected ? 'fill' : 'bold'}
+        />
+      </span>
+      <span className="leading-tight font-bold">{name}</span>
+      {/* Sixteen cards are a lot on a phone: there, only the picked pack shows its line. */}
+      <span
+        className={`mt-0.5 text-sm leading-snug ${selected ? 'text-white/65' : 'hidden text-ink-faint sm:block'}`}
+      >
+        {blurb}
+      </span>
+    </button>
+  )
+}
+
+/** The host writes their own pack. Only the host ever sees the words. */
+function WordsEditor({
+  room,
+  onClose,
+}: {
+  room: RoomConnection
+  onClose: () => void
+}) {
+  const [text, setText] = useState(loadDraft)
+  const words = parseWords(text)
+  const typed = text.split(/[\n,]/).filter((s) => s.trim()).length
+  const skipped = typed - words.length
+  const ready = words.length >= MIN_CUSTOM_WORDS
+
+  const edit = (value: string) => {
+    setText(value)
+    try {
+      localStorage.setItem(DRAFT_KEY, value)
+    } catch {
+      // Storage blocked: the list lasts until the editor closes.
+    }
+  }
+
+  return (
+    <div className="mt-3 animate-pop-in rounded-2xl bg-paper-deep p-4 sm:p-5">
+      <label htmlFor="words" className="font-display text-lg font-bold">
+        Write your own words
+      </label>
+      <p className="mt-1 text-sm leading-snug text-ink-soft">
+        One per line, or split them with commas. Pick things anyone could draw,
+        so Drishti knows them when it sees them. Only you see the list.
+      </p>
+      <textarea
+        id="words"
+        rows={6}
+        value={text}
+        spellCheck={false}
+        onChange={(e) => edit(e.target.value)}
+        placeholder={'pirate ship\nsnowman\ntoaster\nhot air balloon\nsloth'}
+        className="mt-3 w-full resize-y rounded-xl bg-white px-4 py-3 text-base font-semibold outline-none placeholder:text-ink-faint focus:ring-2 focus:ring-ink"
+      />
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-ink-soft" aria-live="polite">
+          {words.length} {words.length === 1 ? 'word' : 'words'}
+          {!ready && (
+            <span className="text-ink-faint">
+              {' '}
+              · at least {MIN_CUSTOM_WORDS} to play
+            </span>
+          )}
+          {skipped > 0 && (
+            <span className="text-ink-faint">
+              {' '}
+              · {skipped} skipped (repeats or over {MAX_WORD_LENGTH} letters)
+            </span>
+          )}
+        </p>
+        <div className="flex gap-2">
+          <button className="btn btn-outline px-5 py-2.5" onClick={onClose}>
+            Close
+          </button>
+          <button
+            className="btn btn-ink px-5 py-2.5"
+            disabled={!ready}
+            onClick={() => {
+              room.send({ t: 'words', words })
+              onClose()
+            }}
+          >
+            <Check className="size-5" /> Use these words
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function loadDraft() {
+  try {
+    return localStorage.getItem(DRAFT_KEY) ?? ''
+  } catch {
+    return ''
+  }
 }
 
 /** Every seat at the table: the players, one seat that invites, and the empty rest. */

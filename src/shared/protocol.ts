@@ -64,6 +64,8 @@ export type RoomSnapshot = {
   code: string
   phase: Phase
   pack: string
+  /** How many words the host wrote for their own pack. The words stay secret. */
+  customWords: number
   round: number
   totalRounds: number
   /** Server time when the current phase ends. */
@@ -81,6 +83,8 @@ export type ClientMessage =
   | { t: 'undo' }
   | { t: 'sync'; round: number; strokes: Stroke[] }
   | { t: 'pack'; pack: string }
+  /** The host's own words; picks the custom pack too. */
+  | { t: 'words'; words: string[] }
   | { t: 'start' }
   | { t: 'again' }
 

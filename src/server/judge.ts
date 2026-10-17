@@ -1,6 +1,7 @@
 // Drishti: asks Cloudflare's Clef decision model what a doodle depicts.
 
 import { env } from 'cloudflare:workers'
+import { OTHER, SCRIBBLE, slug, WRITING } from '#/shared/prompts'
 import type { PromptWord } from '#/shared/prompts'
 import { mockBatch, mockVerdict } from '#/server/mockJudge'
 
@@ -26,10 +27,6 @@ type ClefOutput = {
   usage: { input_tokens: number; output_tokens: number }
 }
 
-export const OTHER = 'something_else'
-export const SCRIBBLE = 'scribble'
-export const WRITING = 'writing'
-
 export type Judgement = {
   /** 0..1, what the player's meter shows. */
   meter: number
@@ -47,8 +44,6 @@ export type Judgement = {
 }
 
 export type BatchResult = { judgements: Judgement[]; ms: number; inputTokens: number }
-
-export const slug = (word: string) => word.toLowerCase().replace(/[^a-z0-9]+/g, '_')
 
 /** `JUDGE_MODE=mock` (the local default) makes up judgements for free instead of calling Clef. */
 export const judgeMode = () => (env.JUDGE_MODE === 'mock' ? 'mock' : 'live')

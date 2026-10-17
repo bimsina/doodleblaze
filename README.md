@@ -23,6 +23,7 @@ Live at **https://doodleblaze.bimsina.dev**. Runs entirely on Cloudflare.
   - Changed canvases are judged at most every 1.5 s, and only once the pen lifts (or a stroke runs past 1.5 s). Up to 4 drawings go in one Clef request.
   - Winners are ordered by when their strokes arrived, not by when Clef answered.
   - Reveal cards reuse the last live check for free ("Definitely a cat", "70% sure this is a fox"). Only drawings filed under "something else" get one more look, against 40 random words, which produces the "8% sure this is a boomerang" verdicts.
+- **The host's own words.** In the lobby the host can write a pack of 5 to 100 words. The room keeps the list; other players only get the count. A word that's also in a built-in pack (409 words across 14 themed packs) keeps its hand-picked look-alikes. Any other word uses three of the host's other words as its look-alikes (they tend to share a theme), topped up from the built-in list.
 
 ### What a check costs
 

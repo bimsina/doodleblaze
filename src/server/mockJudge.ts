@@ -3,8 +3,9 @@
 // some noise, so you can still play and win rounds while testing. The same
 // drawing always gets the same answer, like the real judge.
 
-import { OTHER, SCRIBBLE, slug, toJudgement, WRITING } from '#/server/judge'
+import { toJudgement } from '#/server/judge'
 import type { BatchResult } from '#/server/judge'
+import { OTHER, SCRIBBLE, slug, WRITING } from '#/shared/prompts'
 import type { PromptWord } from '#/shared/prompts'
 
 /** A blank 256px PNG is ~560 bytes; a finished doodle is 3–6 KB. */

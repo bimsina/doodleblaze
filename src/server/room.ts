@@ -25,7 +25,20 @@ import type {
   ServerMessage,
   Stroke,
 } from '#/shared/protocol'
-import { DEFAULT_PACK, findWord, getPack, PACKS, VOCABULARY } from '#/shared/prompts'
+import {
+  CUSTOM_PACK,
+  customPrompt,
+  DEFAULT_PACK,
+  distinctWords,
+  findWord,
+  getPack,
+  MIN_CUSTOM_WORDS,
+  PACKS,
+  parseWords,
+  slug,
+  VOCABULARY,
+} from '#/shared/prompts'
+import type { PromptWord } from '#/shared/prompts'
 import { BASE_TICK_MS, isResting, takeBudget } from '#/server/budget'
 import { judgeBatch, optionsFor, verdict } from '#/server/judge'
 import type { Judgement } from '#/server/judge'
@@ -60,16 +73,23 @@ type Stored = {
   hostId: string | null
   phase: Phase
   pack: string
+  /** The host's own words, used when `pack` is CUSTOM_PACK. */
+  customWords: string[]
   round: number
   endsAt: number | null
   roundStartedAt: number | null
   word: string | null
+  /** The round's word with its look-alikes; custom words aren't in any pack to look up. */
+  prompt: PromptWord | null
   options: string[]
   usedWords: string[]
   players: Player[]
   result: RoundResult | null
   history: RoomSnapshot['history']
 }
+
+/** Rooms saved before the custom pack existed lack these fields. */
+type Saved = Omit<Stored, 'customWords' | 'prompt'> & Partial<Pick<Stored, 'customWords' | 'prompt'>>
 
 type Canvas = {
   strokes: Stroke[]
@@ -108,7 +128,8 @@ export class Room extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
     ctx.blockConcurrencyWhile(async () => {
-      this.state = (await ctx.storage.get<Stored>('state')) ?? null
+      const saved = await ctx.storage.get<Saved>('state')
+      this.state = saved ? { ...saved, customWords: saved.customWords ?? [], prompt: saved.prompt ?? null } : null
     })
   }
 
@@ -122,10 +143,12 @@ export class Room extends DurableObject<Env> {
       hostId: null,
       phase: 'lobby',
       pack: DEFAULT_PACK,
+      customWords: [],
       round: 0,
       endsAt: null,
       roundStartedAt: null,
       word: null,
+      prompt: null,
       options: [],
       usedWords: [],
       players: [],
@@ -213,12 +236,26 @@ export class Room extends DurableObject<Env> {
           this.forcedWord = msg.pack.slice(5)
           return
         }
-        if (this.isHost(player) && state.phase === 'lobby' && PACKS.some((p) => p.id === msg.pack)) {
+        if (!this.isHost(player) || state.phase !== 'lobby') return
+        if (
+          PACKS.some((p) => p.id === msg.pack) ||
+          (msg.pack === CUSTOM_PACK && state.customWords.length >= MIN_CUSTOM_WORDS)
+        ) {
           state.pack = msg.pack
           await this.save()
           this.broadcastState()
         }
         return
+      case 'words': {
+        if (!this.isHost(player) || state.phase !== 'lobby') return
+        const words = parseWords(Array.isArray(msg.words) ? msg.words : [])
+        if (words.length < MIN_CUSTOM_WORDS) return
+        state.customWords = words
+        state.pack = CUSTOM_PACK
+        await this.save()
+        this.broadcastState()
+        return
+      }
       case 'start': {
         const canStart = () => this.isHost(player) && (state.phase === 'lobby' || state.phase === 'final')
         if (!canStart()) return
@@ -295,13 +332,16 @@ export class Room extends DurableObject<Env> {
 
   private async nextRound() {
     const state = this.state!
-    const pack = getPack(state.pack)
-    const fresh = pack.words.filter((w) => !state.usedWords.includes(w.word))
-    const pool = fresh.length ? fresh : pack.words
-    const prompt = findWord(this.forcedWord ?? '') ?? pool[Math.floor(Math.random() * pool.length)]
+    const custom = state.pack === CUSTOM_PACK ? state.customWords : []
+    const prompt =
+      findWord(this.forcedWord ?? '') ??
+      (custom.length
+        ? customPrompt(pickFresh(custom, state.usedWords, (w) => w), custom)
+        : pickFresh(getPack(state.pack).words, state.usedWords, (w) => w.word))
     this.forcedWord = null
     state.round += 1
     state.word = prompt.word
+    state.prompt = prompt
     state.usedWords.push(prompt.word)
     state.options = optionsFor(prompt)
     state.result = null
@@ -390,10 +430,9 @@ export class Room extends DurableObject<Env> {
     if (!state || !result) return
     const unknown = result.drawings.filter((d) => !d.blank && !d.verdict)
     if (!unknown.length) return
-    const words = sample(
-      VOCABULARY.filter((w) => !state.options.includes(w)),
-      VERDICT_WORDS,
-    )
+    // The host's own words join in, for guesses from the room's theme.
+    const custom = state.pack === CUSTOM_PACK ? state.customWords : []
+    const words = sample(distinctWords([...custom, ...VOCABULARY], state.options.map(slug)), VERDICT_WORDS)
     // Always granted: a handful per round. Counting them makes busy rooms slow down to make room.
     await takeBudget(this.env, unknown.length, this.tickMs, true)
     await Promise.all(
@@ -426,6 +465,7 @@ export class Room extends DurableObject<Env> {
     if (!state.players.some((p) => p.id === state.hostId)) state.hostId = state.players[0]?.id ?? null
     state.round = 0
     state.word = null
+    state.prompt = null
     state.result = null
     state.history = []
     this.canvases.clear()
@@ -595,7 +635,7 @@ export class Room extends DurableObject<Env> {
     snapshots: { playerId: string; canvas: Canvas; version: number; at: number; strokes: Stroke[] }[],
   ) {
     const state = this.state!
-    const prompt = findWord(state.word!)
+    const prompt = state.prompt
     if (!prompt) return
     const rendered = await Promise.all(snapshots.map((s) => renderStrokes(s.strokes)))
     const toJudge = snapshots.map((s, i) => ({ s, image: rendered[i] })).filter((x) => !x.image.empty)
@@ -696,6 +736,7 @@ export class Room extends DurableObject<Env> {
       code: state.code,
       phase: state.phase,
       pack: state.pack,
+      customWords: state.customWords.length,
       round: state.round,
       totalRounds: TOTAL_ROUNDS,
       endsAt: state.endsAt,
@@ -753,6 +794,13 @@ function liveVerdict(canvas: Canvas, word: string): Drawing['verdict'] {
   if (canvas.meter >= BLAZE_THRESHOLD) return { label: word, p: canvas.meter }
   if (!canvas.top || canvas.top === 'something else') return undefined
   return { label: canvas.top, p: canvas.topP }
+}
+
+/** A random item whose word hasn't come up this game; repeats only once the pack runs out. */
+function pickFresh<T>(items: T[], used: string[], wordOf: (item: T) => string): T {
+  const fresh = items.filter((item) => !used.includes(wordOf(item)))
+  const pool = fresh.length ? fresh : items
+  return pool[Math.floor(Math.random() * pool.length)]
 }
 
 function sample<T>(items: T[], n: number): T[] {
