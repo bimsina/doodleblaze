@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Logo } from '#/components/Brand'
+import { DrishtiEye, Logo } from '#/components/Brand'
 import { CheckIcon, CopyIcon } from '#/components/Icons'
 import { useNow } from '#/components/Timer'
 import type { RoomConnection } from '#/lib/useRoom'
@@ -62,6 +62,23 @@ export function Countdown({ room }: { room: RoomConnection }) {
       </div>
       <p className="mt-8 font-display text-2xl font-bold">Pen ready. The word drops in a second.</p>
       <p className="mt-2 text-ink-soft">First one Drishti recognizes wins the round.</p>
+    </div>
+  )
+}
+
+/** Shown when the host tries to start while Drishti is taking a break. */
+export function RestingNote({ className = '' }: { className?: string }) {
+  return (
+    <div
+      role="status"
+      className={`flex animate-pop-in items-start gap-3 rounded-2xl border-2 border-ink bg-sun-soft p-4 text-left text-sm leading-relaxed ${className}`}
+    >
+      <DrishtiEye className="size-9 shrink-0" />
+      <p>
+        <b className="font-display text-base">Drishti is resting its eyes.</b>
+        <br />
+        It’s looked at a lot of doodles today. Come back a little later and it’ll be ready to judge again.
+      </p>
     </div>
   )
 }

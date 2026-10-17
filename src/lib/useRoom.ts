@@ -11,6 +11,8 @@ export type RoomConnection = {
   you: string | null
   meters: Record<string, number>
   judge: Judge | null
+  /** The host tried to start while Drishti is taking a break. Clears once a game starts. */
+  resting: boolean
   /** Increments on every successful (re)connect. */
   session: number
   send: (msg: ClientMessage) => void
@@ -27,6 +29,7 @@ export function useRoom(code: string, identity: Identity | null): RoomConnection
   const [you, setYou] = useState<string | null>(null)
   const [meters, setMeters] = useState<Record<string, number>>({})
   const [judge, setJudge] = useState<Judge | null>(null)
+  const [resting, setResting] = useState(false)
   const [session, setSession] = useState(0)
   const wsRef = useRef<WebSocket | null>(null)
   const offsetRef = useRef(0)
@@ -60,6 +63,7 @@ export function useRoom(code: string, identity: Identity | null): RoomConnection
               setMeters({})
               setJudge(null)
             }
+            if (msg.state.phase !== 'lobby' && msg.state.phase !== 'final') setResting(false)
             setState(msg.state)
             setYou(msg.you)
             setError(null)
@@ -79,6 +83,9 @@ export function useRoom(code: string, identity: Identity | null): RoomConnection
               )
               return { ...s, result: { ...s.result, drawings } }
             })
+            break
+          case 'resting':
+            setResting(true)
             break
           case 'error':
             if (FATAL.has(msg.code)) fatal = true
@@ -114,5 +121,5 @@ export function useRoom(code: string, identity: Identity | null): RoomConnection
 
   const now = useCallback(() => Date.now() + offsetRef.current, [])
 
-  return { status, error, state, you, meters, judge, session, send, now }
+  return { status, error, state, you, meters, judge, resting, session, send, now }
 }

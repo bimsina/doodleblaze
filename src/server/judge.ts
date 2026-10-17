@@ -1,5 +1,6 @@
 // Drishti: asks Cloudflare's Clef decision model what a doodle depicts.
 
+import { env } from 'cloudflare:workers'
 import type { PromptWord } from '#/shared/prompts'
 
 export type ClefModel = 'clef' | 'clef-flash'
@@ -82,6 +83,7 @@ export async function judgeBatch(
   prompt: PromptWord,
   options: string[],
   images: string[],
+  room: string,
   temperature = METER_TEMPERATURE,
 ): Promise<BatchResult> {
   const criteria = criteriaFor(options)
@@ -96,12 +98,11 @@ export async function judgeBatch(
     }
   })
   const started = Date.now()
-  const out = await runClef(ai, {
-    model,
-    state: many ? stateMany(images.length) : STATE_ONE,
-    images,
-    questions,
-  })
+  const out = await runClef(
+    ai,
+    { model, state: many ? stateMany(images.length) : STATE_ONE, images, questions },
+    { room, kind: 'judge', drawings: images.length },
+  )
   const ms = Date.now() - started
   const labels: Record<string, string> = { [OTHER]: 'something else', [SCRIBBLE]: 'scribble' }
   for (const word of options) labels[slug(word)] = word
@@ -137,25 +138,30 @@ export async function judgeBatch(
  * No catch-all option here: even a scribble gets compared to a real thing,
  * which is where the funny guesses come from.
  */
-export async function verdict(ai: Ai, model: ClefModel, image: string, vocabulary: string[]) {
+export async function verdict(ai: Ai, model: ClefModel, image: string, vocabulary: string[], room: string) {
   const criteria: Record<string, string> = {}
   for (const word of vocabulary) criteria[slug(word)] = `a ${word}`
-  const out = await runClef(ai, {
-    model,
-    state: STATE_ONE,
-    images: [image],
-    questions: { v: { type: 'choice', instructions: 'What does this doodle depict?', criteria } },
-  })
+  const out = await runClef(
+    ai,
+    {
+      model,
+      state: STATE_ONE,
+      images: [image],
+      questions: { v: { type: 'choice', instructions: 'What does this doodle depict?', criteria } },
+    },
+    { room, kind: 'verdict', drawings: 1 },
+  )
   const a = out.answers.v
   if (a.type !== 'choice') return { label: vocabulary[0], p: 0 }
   const label = vocabulary.find((word) => slug(word) === a.choice) ?? a.choice.replaceAll('_', ' ')
   return { label, p: round3(a.probabilities[a.choice] ?? 0) }
 }
 
-function runClef(ai: Ai, input: ClefInput): Promise<ClefOutput> {
+/** Every call goes through the AI Gateway, tagged so its logs and spend can be split by room and kind. */
+function runClef(ai: Ai, input: ClefInput, metadata: Record<string, string | number>): Promise<ClefOutput> {
   // Clef isn't in the generated Workers AI model types yet.
-  const run = ai.run.bind(ai) as unknown as (model: string, input: ClefInput) => Promise<ClefOutput>
-  return run(`@cf/cloudflare/${input.model}`, input)
+  const run = ai.run.bind(ai) as unknown as (model: string, input: ClefInput, options: AiOptions) => Promise<ClefOutput>
+  return run(`@cf/cloudflare/${input.model}`, input, { gateway: { id: env.AI_GATEWAY, metadata } })
 }
 
 // Re-tempering probabilities is equivalent to dividing Clef's logits by T.

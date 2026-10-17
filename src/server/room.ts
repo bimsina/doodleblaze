@@ -26,12 +26,12 @@ import type {
   Stroke,
 } from '#/shared/protocol'
 import { DEFAULT_PACK, findWord, getPack, PACKS, VOCABULARY } from '#/shared/prompts'
+import { BASE_TICK_MS, isResting, takeBudget } from '#/server/budget'
 import { judgeBatch, optionsFor, verdict } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
 
 const MODEL = 'clef'
-/** Each tick judges every changed canvas, up to 4 per Clef request. */
-const JUDGE_TICK_MS = 1_000
+/** Each tick judges every changed canvas the shared budget allows, up to 4 per Clef request. */
 const BATCH_SIZE = 4
 /** Rooms nobody is connected to are wiped after this long. */
 const IDLE_CLEANUP_MS = 30 * 60_000
@@ -84,6 +84,8 @@ export class Room extends DurableObject<Env> {
   private canvases = new Map<string, Canvas>()
   private judgeTimer: ReturnType<typeof setTimeout> | null = null
   private lastTickAt = 0
+  /** Widens past BASE_TICK_MS when every room together is asking for more than the budget. */
+  private tickMs = BASE_TICK_MS
   /** Earliest snapshot time of each in-flight Clef request. */
   private flights = new Set<{ minAt: number; done: Promise<void> }>()
   private pending: { playerId: string; at: number } | null = null
@@ -207,9 +209,14 @@ export class Room extends DurableObject<Env> {
           this.broadcastState()
         }
         return
-      case 'start':
-        if (this.isHost(player) && (state.phase === 'lobby' || state.phase === 'final')) await this.startGame()
+      case 'start': {
+        const canStart = () => this.isHost(player) && (state.phase === 'lobby' || state.phase === 'final')
+        if (!canStart()) return
+        if (await isResting(this.env)) return this.broadcast({ t: 'resting' })
+        // Another start may have landed while we checked.
+        if (canStart()) await this.startGame()
         return
+      }
       case 'again':
         if (this.isHost(player) && state.phase === 'final') await this.backToLobby()
         return
@@ -310,7 +317,7 @@ export class Room extends DurableObject<Env> {
     // Last look at anything drawn before the buzzer.
     if (this.judgeTimer) clearTimeout(this.judgeTimer)
     this.judgeTimer = null
-    this.judgeTick(true)
+    await this.judgeTick(true)
     await Promise.race([
       Promise.all([...this.flights].map((f) => f.done)),
       new Promise((r) => setTimeout(r, DRAIN_MS)),
@@ -364,11 +371,15 @@ export class Room extends DurableObject<Env> {
   private async addVerdicts(round: number) {
     const result = this.state?.result
     if (!result) return
+    const code = this.state!.code
+    const drawn = result.drawings.filter((d) => !d.blank)
+    if (!drawn.length) return
+    // Always granted: a handful per round. Counting them makes busy rooms slow down to make room.
+    await takeBudget(this.env, drawn.length, this.tickMs, true)
     await Promise.all(
-      result.drawings.map(async (d) => {
-        if (d.blank) return
+      drawn.map(async (d) => {
         try {
-          const v = await verdict(this.env.AI, MODEL, d.image, VOCABULARY)
+          const v = await verdict(this.env.AI, MODEL, d.image, VOCABULARY, code)
           if (this.state?.result?.round !== round) return
           d.verdict = v
           this.broadcast({ t: 'verdict', round, playerId: d.playerId, label: v.label, p: v.p })
@@ -472,20 +483,36 @@ export class Room extends DurableObject<Env> {
   // --- Judging ---
 
   private scheduleJudge() {
-    if (this.judgeTimer || this.pending || this.state?.phase !== 'drawing') return
-    const wait = Math.max(0, this.lastTickAt + JUDGE_TICK_MS - Date.now())
+    if (this.judgeTimer || this.finalizing || this.state?.phase !== 'drawing' || !this.unjudged().length) return
+    const wait = Math.max(0, this.lastTickAt + this.tickMs - Date.now())
     this.judgeTimer = setTimeout(() => {
       this.judgeTimer = null
-      this.judgeTick()
+      void this.judgeTick()
     }, wait)
   }
 
-  private judgeTick(final = false) {
+  /** Changed canvases waiting for Drishti, oldest change first. Once someone has blazed, only ones drawn before that can still win. */
+  private unjudged() {
+    const before = this.pending?.at ?? Infinity
+    return [...this.canvases.entries()]
+      .filter(([, c]) => c.version !== c.judgedVersion && !c.inFlight && c.changedAt < before)
+      .sort((a, b) => a[1].changedAt - b[1].changedAt)
+  }
+
+  private async judgeTick(final = false) {
     const state = this.state
-    if (!state?.word || (!final && (state.phase !== 'drawing' || this.pending))) return
+    if (!state?.word || (!final && (state.phase !== 'drawing' || this.finalizing))) return
+    const round = state.round
     this.lastTickAt = Date.now()
-    const dirty = [...this.canvases.entries()].filter(([, c]) => c.version !== c.judgedVersion && !c.inFlight)
-    for (let i = 0; i < dirty.length; i += BATCH_SIZE) this.launch(dirty.slice(i, i + BATCH_SIZE))
+    const want = Math.ceil(this.unjudged().length / BATCH_SIZE)
+    if (!want) return
+    const { granted, tickMs } = await takeBudget(this.env, want, this.tickMs, final)
+    this.tickMs = tickMs
+    if (this.state?.round !== round || (!final && this.finalizing)) return
+    const ready = this.unjudged().slice(0, granted * BATCH_SIZE)
+    for (let i = 0; i < ready.length; i += BATCH_SIZE) this.launch(ready.slice(i, i + BATCH_SIZE))
+    // Whatever the budget held back goes out on a later tick.
+    this.scheduleJudge()
   }
 
   private launch(batch: [string, Canvas][]) {
@@ -524,6 +551,7 @@ export class Room extends DurableObject<Env> {
           prompt,
           state.options,
           toJudge.map((x) => x.image.dataUrl),
+          state.code,
         )
         if (this.state?.word !== prompt.word) return
         toJudge.forEach(({ s }, i) => {
@@ -556,11 +584,11 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  /** The earliest crossing wins, but only once nothing drawn earlier is still being judged. */
+  /** The earliest crossing wins, but only once nothing drawn earlier is still being judged or waiting its turn. */
   private checkWinner() {
     if (!this.pending || this.finalizing) return
     const at = this.pending.at
-    if ([...this.flights].some((f) => f.minAt < at)) return
+    if ([...this.flights].some((f) => f.minAt < at) || this.unjudged().length) return
     this.ctx.waitUntil(this.finalizeRound())
   }
 

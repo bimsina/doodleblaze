@@ -13,16 +13,50 @@
 	"ai": {
 		"binding": "AI"
 	},
+	"vars": {
+		// Every Clef call goes through this AI Gateway (logs, spend analytics, hard limits).
+		"AI_GATEWAY": "doodleblaze",
+		// Clef requests shared by all rooms. Workers AI allows 300 a minute per account.
+		"JUDGE_PER_MINUTE": "240",
+		// About $5 a day. Past this, new games pause until midnight UTC.
+		"JUDGE_PER_DAY": "20000"
+	},
+	"kv_namespaces": [
+		{
+			// Put "paused" = "1" here to pause new games by hand.
+			"binding": "FLAGS",
+			"id": "b96cf95168a64c3aafcf9b59634513df"
+		}
+	],
+	"ratelimits": [
+		{
+			// Room creation per IP, per Cloudflare location.
+			"name": "ROOM_CREATE_LIMIT",
+			"namespace_id": "7301",
+			"simple": {
+				"limit": 5,
+				"period": 60
+			}
+		}
+	],
 	"durable_objects": {
 		"bindings": [
 			{
 				"name": "ROOMS",
 				"class_name": "Room"
+			},
+			{
+				"name": "BUDGET",
+				"class_name": "JudgeBudget"
 			}
 		]
 	},
 	"exports": {
 		"Room": {
+			"type": "durable-object",
+			"storage": "sqlite"
+		},
+		"JudgeBudget": {
 			"type": "durable-object",
 			"storage": "sqlite"
 		}

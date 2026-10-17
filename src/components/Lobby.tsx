@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Avatar } from '#/components/Avatar'
 import { DrishtiEye } from '#/components/Brand'
 import { CheckIcon, CrownIcon, FlameIcon, LinkIcon } from '#/components/Icons'
+import { RestingNote } from '#/components/RoomChrome'
 import { MAX_PLAYERS } from '#/shared/protocol'
 import { PACKS } from '#/shared/prompts'
 import type { RoomConnection } from '#/lib/useRoom'
@@ -103,6 +104,7 @@ export function Lobby({ room }: { room: RoomConnection }) {
           </p>
         </div>
 
+        {room.resting && <RestingNote className="mt-6" />}
         {isHost ? (
           <button className="btn btn-blaze mt-6 w-full py-4 text-lg" onClick={() => room.send({ t: 'start' })}>
             <FlameIcon className="size-5" />

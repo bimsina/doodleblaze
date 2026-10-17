@@ -1,6 +1,7 @@
 import { Avatar } from '#/components/Avatar'
 import { DrishtiEye } from '#/components/Brand'
 import { CrownIcon, FlameIcon } from '#/components/Icons'
+import { RestingNote } from '#/components/RoomChrome'
 import { useNow } from '#/components/Timer'
 import { verdictLine } from '#/lib/drishti'
 import type { RoomConnection } from '#/lib/useRoom'
@@ -188,6 +189,7 @@ export function Final({ room }: { room: RoomConnection }) {
         </p>
       )}
 
+      {room.resting && <RestingNote className="mt-8 max-w-md" />}
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         {me?.host ? (
           <>
