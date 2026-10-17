@@ -5,11 +5,28 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "doodleblaze",
-	"compatibility_date": "2025-09-02",
+	"compatibility_date": "2026-10-01",
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"main": "@tanstack/react-start/server-entry",
+	"main": "src/server.ts",
+	"ai": {
+		"binding": "AI"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "ROOMS",
+				"class_name": "Room"
+			}
+		]
+	},
+	"exports": {
+		"Room": {
+			"type": "durable-object",
+			"storage": "sqlite"
+		}
+	},
 	"observability": {
 		"enabled": true
 	},
