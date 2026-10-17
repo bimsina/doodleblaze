@@ -22,9 +22,9 @@ async function createRoom() {
 /** A bot player. Bot 0 is the host. Scribbles keep its canvas changing, so it always wants judging. */
 function bot(code, i, room) {
   const params = new URLSearchParams({ pid: crypto.randomUUID(), tok: crypto.randomUUID(), name: `Bot ${i + 1}` })
-  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/api/rooms/${code}/ws?${params}`)
-  const me = { i, ws, judged: [], strokes: 0, timer: null, round: 0, phase: null }
-  const send = (msg) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg))
+  const url = `${base.replace(/^http/, 'ws')}/api/rooms/${code}/ws?${params}`
+  const me = { i, judged: [], strokes: 0, timer: null, round: 0, phase: null, done: false }
+  const send = (msg) => me.ws.readyState === WebSocket.OPEN && me.ws.send(JSON.stringify(msg))
   const stroke = (p) => send({ t: 'stroke', id: me.strokes++, e: false, p })
   const scribble = () => {
     let x = 200 + Math.random() * 600
@@ -33,7 +33,7 @@ function bot(code, i, room) {
     for (let k = 0; k < 12; k++) p.push(Math.round((x += (Math.random() - 0.5) * 80)), Math.round((y += (Math.random() - 0.5) * 80)))
     stroke(p.map((v) => Math.min(1000, Math.max(0, v))))
   }
-  ws.onmessage = (ev) => {
+  const onmessage = (ev) => {
     const msg = JSON.parse(ev.data)
     if (msg.t === 'state') {
       const s = msg.state
@@ -62,15 +62,33 @@ function bot(code, i, room) {
       console.log(`${ts()} bot ${i} error`, msg.code, msg.message)
     }
   }
+  let opened
+  me.opened = new Promise((r) => (opened = r))
+  // Same seat on reconnect, like a browser tab would.
+  const connect = (attempt = 0) => {
+    const ws = new WebSocket(url)
+    me.ws = ws
+    ws.onmessage = onmessage
+    ws.onopen = opened
+    ws.onclose = (ev) => {
+      if (me.done) return
+      console.log(`${ts()} bot ${i} socket closed (${ev.code}), reconnecting`)
+      if (attempt < 5) setTimeout(() => connect(attempt + 1), 500)
+    }
+  }
+  connect()
   me.send = send
-  me.opened = new Promise((r) => ws.addEventListener('open', r))
   return me
 }
 
 async function startRoom(code, { sketch = false, word } = {}) {
   const room = { code, sketch, verdicts: 0, resting: false, phase: null, results: [], onPhase: () => {} }
-  const bots = Array.from({ length: PLAYERS }, (_, i) => bot(code, i, room))
-  await Promise.all(bots.map((b) => b.opened))
+  // Join one after another, like people opening the invite link.
+  const bots = []
+  for (let i = 0; i < PLAYERS; i++) {
+    bots.push(bot(code, i, room))
+    await bots[i].opened
+  }
   await new Promise((r) => setTimeout(r, 500))
   // Only takes effect with LAB_ENABLED=1 (local dev); ignored in production.
   if (word) bots[0].send({ t: 'pack', pack: `word:${word}` })
@@ -87,7 +105,7 @@ function judgeStats(bots) {
   return { total, avgGapS: +(avg / 1000).toFixed(2) }
 }
 
-const close = (bots) => bots.forEach((b) => (clearInterval(b.timer), b.ws.close()))
+const close = (bots) => bots.forEach((b) => ((b.done = true), clearInterval(b.timer), b.ws.close()))
 
 if (mode === 'create') {
   for (let k = 1; k <= 8; k++) {

@@ -18,8 +18,8 @@
 		"AI_GATEWAY": "doodleblaze",
 		// Clef requests shared by all rooms. Workers AI allows 300 a minute per account.
 		"JUDGE_PER_MINUTE": "240",
-		// About $5 a day. Past this, new games pause until midnight UTC.
-		"JUDGE_PER_DAY": "20000"
+		// About $5 a day at most (judge ~$0.00033, verdict ~$0.0008 each). Past this, new games pause until midnight UTC.
+		"JUDGE_PER_DAY": "15000"
 	},
 	"kv_namespaces": [
 		{
