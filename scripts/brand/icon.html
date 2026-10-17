@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- App icon: the mark on a full-bleed ink square. ?size=180 sets the pixel size (anchored top-left,
+     since headless Chrome won't make a window that small); &safe=1 shrinks it into the maskable safe zone. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; background: #fff; }
+      .icon { position: absolute; left: 0; top: 0; background: #1d1b18; display: grid; place-items: center; }
+    </style>
+  </head>
+  <body>
+    <div class="icon">
+      <svg viewBox="2 2 36 36"><path d="M9.5 26.5C12.5 20.5 15 17 17.5 18.2c2.6 1.3-1.4 7 1.6 7.6 3 .6 4.6-5.6 7.9-6" transform="translate(20 20) scale(1.4) translate(-18.25 -22.35)" fill="none" stroke="#fffdf9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <script>
+      const q = new URLSearchParams(location.search)
+      const size = Number(q.get('size') || 512)
+      const inner = Math.round(size * (q.get('safe') ? 0.58 : 0.78))
+      const icon = document.querySelector('.icon')
+      icon.style.width = icon.style.height = size + 'px'
+      const svg = document.querySelector('svg')
+      svg.setAttribute('width', inner)
+      svg.setAttribute('height', inner)
+    </script>
+  </body>
+</html>

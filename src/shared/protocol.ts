@@ -5,7 +5,8 @@ export const TOTAL_ROUNDS = 5
 export const BLAZE_THRESHOLD = 0.75
 export const COUNTDOWN_MS = 3_000
 export const ROUND_MS = 60_000
-export const REVEAL_MS = 12_000
+// Includes the ~2.5 s blaze celebration clients play before showing the reveal.
+export const REVEAL_MS = 14_000
 export const BLAZE_POINTS = 100
 export const CONSOLATION_POINTS = 20
 

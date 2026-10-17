@@ -1,5 +1,7 @@
 # Doodleblaze
 
+![Doodleblaze: a doodle of a giraffe stamped "Blazed!" with its meter past the 75% blaze line](public/og.png)
+
 A multiplayer drawing race. Everyone draws the same word at the same time while Drishti, an AI judge, watches every canvas. The first drawing Drishti recognizes (past 75%) wins the round.
 
 Live at **https://doodleblaze.bimsina.dev**. Runs entirely on Cloudflare.
@@ -85,6 +87,8 @@ node scripts/judge-lab.mjs /tmp/lab '[{"word":"cat","drawings":["cat_2_ears","ca
 ```
 
 Prompt packs and distractors live in `src/shared/prompts.ts`; timings and scoring in `src/shared/protocol.ts`.
+
+The share image (`public/og.png`) and app icons are rendered from `scripts/brand/*.html` with headless Chrome: `bash scripts/brand/render.sh`. Icons in the UI are [Phosphor](https://phosphoricons.com).
 
 ## Deploy
 

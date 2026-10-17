@@ -1,0 +1,14 @@
+{
+  "name": "Doodleblaze",
+  "short_name": "Doodleblaze",
+  "description": "A drawing race with friends. Everyone draws the same word, and the first drawing the bot recognizes wins.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ff5a1f",
+  "theme_color": "#ff5a1f",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

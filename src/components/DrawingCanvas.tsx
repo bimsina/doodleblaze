@@ -20,6 +20,9 @@ type Props = {
 
 // Drishti looks at most every ~1.5 s and waits for the pen to lift, so there's no need to stream faster.
 const FLUSH_MS = 250
+// The page shows a soft paper color; the eraser paints the same. (The server
+// renders on white either way, so this is purely how it looks here.)
+const PAPER = '#f7f4ef'
 const MIN_STEP = 3
 
 export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCanvas(
@@ -40,7 +43,7 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
     const k = w / COORD_MAX
     c.lineCap = 'round'
     c.lineJoin = 'round'
-    c.strokeStyle = s.e ? '#ffffff' : '#1d1b18'
+    c.strokeStyle = s.e ? PAPER : '#1d1b18'
     c.fillStyle = c.strokeStyle
     c.lineWidth = (s.e ? ERASER_WIDTH : PEN_WIDTH) * w
     const p = s.p
@@ -60,7 +63,7 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
   const redraw = useCallback(() => {
     const c = ctx()
     if (!c) return
-    c.fillStyle = '#ffffff'
+    c.fillStyle = PAPER
     c.fillRect(0, 0, c.canvas.width, c.canvas.height)
     for (const s of strokesRef.current) paintStroke(c, s)
   }, [paintStroke])
@@ -173,7 +176,7 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
   return (
     <div
       ref={wrapRef}
-      className="relative aspect-square w-full overflow-hidden rounded-[1.25rem] border-2 border-ink bg-white shadow-[var(--shadow-pop-lg)]"
+      className="relative aspect-square w-full overflow-hidden rounded-3xl bg-canvas"
     >
       <canvas
         ref={canvasRef}
@@ -186,7 +189,7 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
       />
       {tool === 'eraser' && cursor && !disabled && (
         <div
-          className="pointer-events-none absolute rounded-full border-2 border-ink/60 bg-white/40"
+          className="pointer-events-none absolute rounded-full border-2 border-ink/50 bg-white/50"
           style={{
             width: eraserSize,
             height: eraserSize,

@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Avatar } from '#/components/Avatar'
-import { DrishtiEye } from '#/components/Brand'
+import { ArrowCounterClockwise, Eraser, Eye, FlagCheckered, PencilSimple } from '@phosphor-icons/react'
 import { DrawingCanvas } from '#/components/DrawingCanvas'
 import type { CanvasHandle, Tool } from '#/components/DrawingCanvas'
-import { EraserIcon, FlameIcon, PenIcon, UndoIcon } from '#/components/Icons'
-import { Meter, MiniMeter } from '#/components/Meter'
-import { TimerRing } from '#/components/Timer'
+import { MeterBar, Ring } from '#/components/Meter'
+import type { Delta } from '#/components/Meter'
+import { BlazeBanner, BlazeBurst, TimeUp } from '#/components/Moments'
+import { Band, RoomTop } from '#/components/Poster'
+import { TimerBadge } from '#/components/Timer'
 import { lineFor, moodFor } from '#/lib/drishti'
 import type { RoomConnection } from '#/lib/useRoom'
-import { BLAZE_THRESHOLD, ROUND_MS } from '#/shared/protocol'
+import type { Moment } from '#/lib/useStagedRoom'
 
-export function DrawPhase({ room }: { room: RoomConnection }) {
+/** A check that moves the meter at least this much shows a "+12" next to it. */
+const DELTA_MIN = 0.05
+
+export function DrawPhase({ room, moment }: { room: RoomConnection; moment: Moment | null }) {
   const state = room.state!
   const me = state.players.find((p) => p.id === room.you)
   const waiting = !!me?.waiting
@@ -25,7 +29,17 @@ export function DrawPhase({ room }: { room: RoomConnection }) {
   const mood = moodFor(hasInk ? meter : 0, hasInk, writing)
   // A new line only when the mood changes, so Drishti doesn't chatter.
   const seed = useMemo(() => Math.floor(Math.random() * 1000), [mood])
-  const line = lineFor(mood, seed, word, room.judge?.guess ?? null)
+  const line = waiting ? 'Watching the others for now.' : lineFor(mood, seed, word, room.judge?.guess ?? null)
+
+  // Show how much the last stroke helped: purposeful feedback, not decoration.
+  const [delta, setDelta] = useState<Delta | null>(null)
+  const lastMeter = useRef(0)
+  useEffect(() => {
+    if (!room.judge) return
+    const d = room.judge.meter - lastMeter.current
+    lastMeter.current = room.judge.meter
+    if (d >= DELTA_MIN) setDelta({ value: d, key: room.judge.at })
+  }, [room.judge?.at])
 
   const onPoints = useCallback(
     (id: number, e: boolean, p: number[], end: boolean) => room.send({ t: 'stroke', id, e, p, ...(end && { end }) }),
@@ -53,121 +67,129 @@ export function DrawPhase({ room }: { room: RoomConnection }) {
   }, [])
 
   const others = state.players.filter((p) => p.id !== room.you && !p.waiting)
-  const disabled = waiting || judging || state.phase !== 'drawing'
+  const disabled = waiting || judging || !!moment || state.phase !== 'drawing'
+  const winner = moment && !moment.mine ? state.players.find((p) => p.id === moment.winnerId) : undefined
+
+  const race =
+    others.length === 0 ? (
+      <p className="text-sm font-semibold text-ink-faint">Solo practice: just you against the clock.</p>
+    ) : (
+      <div className="flex flex-wrap gap-x-2 gap-y-3">
+        {others.map((p) => (
+          <Ring
+            key={p.id}
+            value={room.meters[p.id] ?? 0}
+            name={p.name}
+            color={p.color}
+            faded={!p.connected}
+            celebrate={moment?.winnerId === p.id}
+          />
+        ))}
+      </div>
+    )
 
   return (
-    <div className="grid gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
-      <div className="mx-auto w-full max-w-[min(100%,calc(100dvh-260px))] min-w-[280px] lg:mx-0 lg:ml-auto">
-        <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="flex flex-1 flex-col select-none">
+      <Band tone="sun">
+        <RoomTop room={room} tone="sun" />
+        <div className="flex items-end justify-between gap-4 pb-5">
           <div className="min-w-0">
-            <p className="eyebrow">
+            <p className="text-sm font-bold text-ink/60">
               Round {state.round} of {state.totalRounds} · draw
             </p>
-            <h1 className="truncate font-display text-4xl leading-tight font-extrabold tracking-tight sm:text-5xl">
+            {/* Long words ("birthday cake") wrap and step down a size instead of being cut off. */}
+            <h1
+              key={state.round}
+              className={`animate-word font-display leading-[0.95] font-extrabold text-balance sm:text-6xl ${word.length > 9 ? 'text-4xl' : 'text-5xl'}`}
+            >
               {word}
             </h1>
           </div>
-          {state.endsAt && <TimerRing endsAt={state.endsAt} totalMs={ROUND_MS} now={room.now} />}
+          {state.endsAt && <TimerBadge endsAt={state.endsAt} now={room.now} />}
         </div>
+      </Band>
 
-        {/* Compact meter for small screens, where the side panel sits below the canvas. */}
-        <div className="mb-3 flex items-center gap-3 lg:hidden">
-          <DrishtiEye meter={meter} className="size-8 shrink-0" />
-          <div className="flex-1">
-            <MiniMeter value={meter} />
+      <div className="mx-auto grid w-full max-w-5xl flex-1 content-start gap-6 px-5 py-6 sm:px-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-12 lg:py-8">
+        {/* Phones: the meter sits above the canvas so it stays in view while drawing. */}
+        <div className="flex flex-col gap-4 lg:hidden">
+          <div>
+            <MeterBar value={meter} delta={delta} compact />
+            <DrishtiSays line={line} meter={meter} compact />
           </div>
-          <span className="w-12 text-right font-display text-xl font-extrabold tabular-nums">{Math.round(meter * 100)}%</span>
+          {others.length > 0 && race}
         </div>
-        <p key={line} className="-mt-1 mb-3 animate-rise truncate text-sm font-semibold text-ink-soft lg:hidden">
-          {waiting ? 'Watching the others for now.' : line}
-        </p>
 
-        <div className="relative">
-          <DrawingCanvas
-            key={state.round}
-            ref={canvasRef}
-            tool={tool}
-            disabled={disabled}
-            onPoints={onPoints}
-            onUndo={onUndo}
-            onInkChange={setHasInk}
-          />
-          {(waiting || judging) && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-[1.25rem] bg-paper/70 p-6 text-center backdrop-blur-[2px]">
-              <div className="card animate-pop-in max-w-xs p-5">
-                {judging ? (
-                  <>
-                    <p className="font-display text-2xl font-extrabold">Time!</p>
-                    <p className="mt-1 text-ink-soft">Drishti is taking one last look…</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-display text-2xl font-extrabold">You’re in!</p>
-                    <p className="mt-1 text-ink-soft">This round is underway. You’ll draw from the next one.</p>
-                  </>
-                )}
+        {/* Sized so the tools stay on screen: stacked layouts also fit the meter and race above the canvas. */}
+        <div className="mx-auto flex w-full max-w-[min(100%,calc(100dvh-430px))] min-w-[260px] flex-col items-center lg:max-w-[min(100%,calc(100dvh-270px))]">
+          <div className="relative w-full">
+            <DrawingCanvas
+              key={state.round}
+              ref={canvasRef}
+              tool={tool}
+              disabled={disabled}
+              onPoints={onPoints}
+              onUndo={onUndo}
+              onInkChange={setHasInk}
+            />
+            {moment?.mine && <BlazeBurst winMs={moment.winMs} />}
+            {winner && <BlazeBanner name={winner.name} color={winner.color} winMs={moment!.winMs} />}
+            {!moment && judging && <TimeUp />}
+            {!moment && waiting && !judging && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-3xl bg-canvas/80 p-6 text-center backdrop-blur-[2px]">
+                <div className="animate-pop-in">
+                  <p className="font-display text-4xl font-extrabold">You’re in!</p>
+                  <p className="mt-1 font-semibold text-ink-soft">You’ll draw from the next round.</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+          <div className="mt-4 flex items-center gap-1">
+            <ToolButton active={tool === 'pen'} onClick={() => setTool('pen')} label="Pen (P)">
+              <PencilSimple className="size-6" />
+            </ToolButton>
+            <ToolButton active={tool === 'eraser'} onClick={() => setTool('eraser')} label="Eraser (E)">
+              <Eraser className="size-6" />
+            </ToolButton>
+            <ToolButton onClick={() => canvasRef.current?.undo()} label="Undo (Ctrl/⌘ Z)" disabled={disabled}>
+              <ArrowCounterClockwise className="size-6" />
+            </ToolButton>
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-center gap-2">
-          <ToolButton active={tool === 'pen'} onClick={() => setTool('pen')} label="Pen (P)">
-            <PenIcon />
-          </ToolButton>
-          <ToolButton active={tool === 'eraser'} onClick={() => setTool('eraser')} label="Eraser (E)">
-            <EraserIcon />
-          </ToolButton>
-          <span className="mx-1 h-8 w-0.5 bg-line" />
-          <ToolButton onClick={() => canvasRef.current?.undo()} label="Undo (Ctrl/⌘ Z)" disabled={disabled}>
-            <UndoIcon />
-          </ToolButton>
-        </div>
+        <aside className="hidden flex-col lg:flex">
+          <MeterBar value={meter} delta={delta} />
+          <div className="mt-6">
+            <DrishtiSays line={line} meter={meter} />
+          </div>
+          <div className="mt-auto pt-8">
+            <p className="mb-3 flex items-center gap-2 text-sm font-bold text-ink-soft">
+              <FlagCheckered className="size-4" /> The race
+            </p>
+            {race}
+          </div>
+        </aside>
       </div>
+    </div>
+  )
+}
 
-      <aside className="flex flex-col gap-5">
-        <section className="card p-5">
-          <div className="flex items-start gap-3">
-            <DrishtiEye meter={meter} className="size-12 shrink-0" />
-            <div className="min-w-0">
-              <p className="eyebrow">Drishti says</p>
-              <p key={line} className="mt-1 animate-rise font-display text-lg leading-snug font-bold">
-                {waiting ? 'Watching the others for now.' : line}
-              </p>
-            </div>
-          </div>
-          <div className="mt-5">
-            <Meter value={meter} />
-          </div>
-        </section>
-
-        <section className="card p-5">
-          <p className="eyebrow">The race</p>
-          {others.length === 0 ? (
-            <p className="mt-3 text-sm text-ink-soft">Solo practice: it’s you against the clock.</p>
-          ) : (
-            <ul className="mt-3 flex flex-col gap-3">
-              {others.map((p) => {
-                const m = room.meters[p.id] ?? 0
-                return (
-                  <li key={p.id} className={`flex items-center gap-3 ${p.connected ? '' : 'opacity-45'}`}>
-                    <Avatar name={p.name} color={p.color} className="size-8 text-xs" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-semibold">{p.name}</span>
-                        {m >= BLAZE_THRESHOLD && <FlameIcon className="size-4 text-blaze" />}
-                      </div>
-                      <div className="mt-1">
-                        <MiniMeter value={m} />
-                      </div>
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </section>
-      </aside>
+/** Drishti's running commentary. The eye warms from ink to yellow to orange as the meter climbs. */
+function DrishtiSays({ line, meter, compact }: { line: string; meter: number; compact?: boolean }) {
+  const tone = meter >= 0.75 ? 'bg-blaze text-white' : meter >= 0.3 ? 'bg-sun text-ink' : 'bg-ink text-white'
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full transition-colors duration-500 ${tone} ${compact ? 'size-7' : 'size-10'}`}
+        title="Drishti"
+      >
+        <Eye className={compact ? 'size-4' : 'size-5'} weight="fill" />
+      </span>
+      <p
+        key={line}
+        className={`animate-rise font-semibold ${compact ? 'min-w-0 truncate pt-0.5 text-ink-soft' : 'pt-1 text-xl leading-snug'}`}
+      >
+        “{line}”
+      </p>
     </div>
   )
 }
@@ -193,7 +215,9 @@ function ToolButton({
       aria-pressed={active}
       disabled={disabled}
       onClick={onClick}
-      className={`btn size-12 p-0 ${active ? 'bg-ink text-paper' : ''}`}
+      className={`flex size-12 items-center justify-center rounded-2xl transition-colors disabled:opacity-40 ${
+        active ? 'bg-ink text-white' : 'text-ink-soft enabled:hover:bg-paper-deep'
+      }`}
     >
       {children}
     </button>

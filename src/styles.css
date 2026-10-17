@@ -1,37 +1,140 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Gabarito', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Figtree', ui-sans-serif, system-ui, sans-serif;
 
-  --color-paper: #faf6ef;
-  --color-paper-deep: #f1ebe0;
-  --color-card: #fffdf9;
+  --color-paper: #ffffff;
+  /* Soft fill for inputs, pills, and rows on white. */
+  --color-paper-deep: #f3efe8;
+  /* The drawing surface and reveal tiles. */
+  --color-canvas: #f7f4ef;
   --color-ink: #1d1b18;
   --color-ink-soft: #5d5850;
   --color-ink-faint: #9a9388;
-  --color-line: #e3dccf;
+  --color-line: #e7e2d8;
   --color-blaze: #ff5a1f;
-  --color-blaze-deep: #d9430c;
-  --color-blaze-soft: #ffe2d4;
+  --color-blaze-deep: #e2480f;
   --color-sun: #ffc23d;
-  --color-sun-soft: #fff1cc;
-  --color-sky: #4a9eff;
   --color-moss: #2fa36b;
 
-  --shadow-pop: 3px 3px 0 0 var(--color-ink);
-  --shadow-pop-lg: 5px 5px 0 0 var(--color-ink);
-
   --animate-pop-in: pop-in 380ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-tick: tick 420ms cubic-bezier(0.2, 1.4, 0.4, 1);
+  --animate-stamp: stamp 520ms cubic-bezier(0.2, 1.5, 0.35, 1) both;
+  --animate-word: word-in 560ms cubic-bezier(0.2, 1.4, 0.35, 1) both;
+  --animate-float-up: float-up 1100ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  --animate-ring-out: ring-out 900ms cubic-bezier(0.1, 0.7, 0.3, 1) both;
+  --animate-spark: spark 850ms cubic-bezier(0.1, 0.8, 0.3, 1) both;
+  --animate-grow-up: grow-up 700ms cubic-bezier(0.2, 1.1, 0.3, 1) both;
+  --animate-drop-in: drop-in 600ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  --animate-banner: banner 420ms cubic-bezier(0.2, 1.2, 0.3, 1) both;
+  --animate-pulse-ring: pulse-ring 1.2s ease-out infinite;
   --animate-rise: rise 500ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
   --animate-wiggle: wiggle 600ms ease-in-out;
-  --animate-blink: blink 5s infinite;
 }
 
 @keyframes pop-in {
   from {
     opacity: 0;
     transform: scale(0.85);
+  }
+}
+
+@keyframes tick {
+  from {
+    transform: scale(1.18);
+  }
+}
+
+/* A rubber stamp landing: big and tilted, then settles. */
+@keyframes stamp {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-14deg);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(-6deg);
+  }
+}
+
+/* The prompt word drops into the band when a round starts. */
+@keyframes word-in {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(1.25);
+  }
+}
+
+@keyframes float-up {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) scale(1);
+  }
+}
+
+@keyframes ring-out {
+  from {
+    opacity: 0.9;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+/* Each spark flies along its own --dx/--dy (set inline). */
+@keyframes spark {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  }
+}
+
+@keyframes grow-up {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-40px) rotate(-20deg);
+  }
+}
+
+@keyframes banner {
+  from {
+    opacity: 0;
+    transform: translateY(-24px) scale(0.96);
+  }
+}
+
+@keyframes pulse-ring {
+  from {
+    box-shadow: 0 0 0 0 rgb(255 90 31 / 0.55);
+  }
+  to {
+    box-shadow: 0 0 0 14px rgb(255 90 31 / 0);
   }
 }
 
@@ -48,33 +151,39 @@
     transform: rotate(0);
   }
   25% {
-    transform: rotate(-3deg);
+    transform: rotate(-4deg);
   }
   75% {
-    transform: rotate(3deg);
+    transform: rotate(4deg);
   }
 }
 
-@keyframes blink {
-  0%,
-  46%,
-  50%,
-  100% {
-    transform: scaleY(1);
-  }
-  48% {
-    transform: scaleY(0.1);
-  }
+/* Phase changes cross-fade, and the color band morphs (color and height) from one phase to the next. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+}
+::view-transition-group(band) {
+  animation-duration: 480ms;
+  animation-timing-function: cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+/* Crop (never stretch) the band's contents while it grows or shrinks. */
+::view-transition-old(band),
+::view-transition-new(band) {
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  animation-duration: 480ms;
 }
 
-@keyframes burst {
-  from {
-    opacity: 0.8;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 0;
-    transform: scale(1.8);
+/* Motion is decoration here; people who ask for less get almost none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }
 
@@ -86,9 +195,7 @@
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: var(--color-paper);
-    background-image: radial-gradient(color-mix(in srgb, var(--color-ink) 9%, transparent) 1px, transparent 1px);
-    background-size: 22px 22px;
+    background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
@@ -99,49 +206,41 @@
   }
 
   :focus-visible {
-    outline: 2.5px solid var(--color-sky);
+    outline: 2.5px solid var(--color-ink);
     outline-offset: 2px;
   }
 }
 
 @layer components {
-  .card {
-    background: var(--color-card);
-    border: 2px solid var(--color-ink);
-    border-radius: 1.25rem;
-    box-shadow: var(--shadow-pop);
-  }
-
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border: 2px solid var(--color-ink);
-    border-radius: 0.9rem;
-    padding: 0.7rem 1.15rem;
+    border-radius: 9999px;
+    padding: 0.85rem 1.4rem;
     font-weight: 700;
     line-height: 1.1;
-    background: var(--color-card);
-    box-shadow: var(--shadow-pop);
     cursor: pointer;
     user-select: none;
     transition:
       transform 120ms ease,
-      box-shadow 120ms ease,
-      background-color 120ms ease;
-  }
-  .btn:hover:not(:disabled) {
-    transform: translate(-1px, -1px);
-    box-shadow: 4px 4px 0 0 var(--color-ink);
+      background-color 120ms ease,
+      color 120ms ease;
   }
   .btn:active:not(:disabled) {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 0 var(--color-ink);
+    transform: scale(0.97);
   }
   .btn:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+  .btn-ink {
+    background: var(--color-ink);
+    color: white;
+  }
+  .btn-ink:hover:not(:disabled) {
+    background: #3a3631;
   }
   .btn-blaze {
     background: var(--color-blaze);
@@ -150,40 +249,24 @@
   .btn-blaze:hover:not(:disabled) {
     background: var(--color-blaze-deep);
   }
-  .btn-ghost {
-    box-shadow: none;
-    border-color: transparent;
-    background: transparent;
+  .btn-outline {
+    box-shadow: inset 0 0 0 2px var(--color-ink);
   }
-  .btn-ghost:hover:not(:disabled) {
-    box-shadow: none;
-    transform: none;
+  .btn-outline:hover:not(:disabled) {
+    background: var(--color-ink);
+    color: white;
+  }
+  .btn-soft {
     background: var(--color-paper-deep);
   }
-
-  .field {
-    width: 100%;
-    border: 2px solid var(--color-ink);
-    border-radius: 0.9rem;
-    background: white;
-    padding: 0.7rem 0.9rem;
-    font-weight: 600;
-    outline: none;
-    transition: box-shadow 120ms ease;
+  .btn-soft:hover:not(:disabled) {
+    background: var(--color-line);
   }
-  .field:focus {
-    box-shadow: 0 0 0 3px var(--color-sun);
+  .btn-glass {
+    background: rgb(255 255 255 / 0.2);
+    color: inherit;
   }
-  .field::placeholder {
-    color: var(--color-ink-faint);
-    font-weight: 500;
-  }
-
-  .eyebrow {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-ink-soft);
+  .btn-glass:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.3);
   }
 }

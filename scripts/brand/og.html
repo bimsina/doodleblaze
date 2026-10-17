@@ -1,0 +1,60 @@
+<!doctype html>
+<!-- The link-preview card (1200x630). Rendered to public/og.png by scripts/brand/render.sh.
+     The flame is Phosphor's "Fire" (fill); the mark matches src/components/Brand.tsx. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gabarito:wght@700;800;900&family=Figtree:wght@600;700;800&display=block" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+      body { background: #ff5a1f; color: #fff; font-family: Figtree, sans-serif; position: relative; }
+
+      .mark { position: absolute; left: 72px; top: 60px; width: 60px; height: 60px; }
+      .word { position: absolute; left: 66px; top: 150px; font: 900 172px/0.82 Gabarito, sans-serif; letter-spacing: -0.025em; }
+      .tag { position: absolute; left: 72px; top: 462px; width: 540px; font-size: 30px; font-weight: 700; line-height: 1.28; color: rgb(255 255 255 / 0.9); }
+
+      .tile { position: absolute; right: 92px; top: 70px; width: 410px; height: 470px; background: #f7f4ef; border-radius: 40px;
+              transform: rotate(3.5deg); box-shadow: 0 34px 70px -28px rgb(110 26 0 / 0.6); color: #1d1b18; }
+      .tile .doodle { position: absolute; left: 50px; top: 28px; width: 310px; height: 310px; }
+      .meter { position: absolute; left: 36px; right: 36px; bottom: 36px; }
+      .meter .row { display: flex; align-items: baseline; justify-content: space-between; }
+      .meter .pct { font: 900 64px/1 Gabarito, sans-serif; color: #ff5a1f; }
+      .meter .line { font: 800 18px/1 Figtree, sans-serif; color: #9a9388; }
+      .bar { position: relative; margin-top: 14px; height: 16px; border-radius: 99px; background: #e9e3d8; }
+      .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 81%; border-radius: 99px; background: #ff5a1f; }
+      .bar b { position: absolute; left: 75%; top: -8px; width: 6px; height: 32px; border-radius: 99px; background: #1d1b18; transform: translateX(-50%); }
+
+      .stamp { position: absolute; left: 618px; top: 118px; display: flex; align-items: center; gap: 14px; padding: 16px 28px 16px 20px;
+               background: #1d1b18; border-radius: 26px; transform: rotate(-7deg); box-shadow: 0 24px 46px -20px rgb(0 0 0 / 0.55); }
+      .stamp svg { width: 54px; height: 54px; }
+      .stamp div { font: 900 58px/0.95 Gabarito, sans-serif; }
+      .stamp small { display: block; margin-top: 6px; font: 800 20px/1 Figtree, sans-serif; color: #ffc23d; }
+    </style>
+  </head>
+  <body>
+    <svg class="mark" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="11" fill="#1d1b18"/><path d="M9.5 26.5C12.5 20.5 15 17 17.5 18.2c2.6 1.3-1.4 7 1.6 7.6 3 .6 4.6-5.6 7.9-6" transform="translate(20 20) scale(1.4) translate(-18.25 -22.35)" fill="none" stroke="#fffdf9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <div class="word">doodle<br />blaze</div>
+    <div class="tag">Everyone draws the same word. First one the bot recognizes wins.</div>
+
+    <div class="tile">
+      <svg class="doodle" viewBox="0 0 200 200" fill="none" stroke="#1d1b18" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="88" cy="128" rx="42" ry="22" />
+        <path d="M58 145 L54 182 M76 148 L76 184 M104 148 L104 184 M120 142 L126 180" />
+        <path d="M118 116 L142 52 M128 124 L152 58" />
+        <ellipse cx="154" cy="46" rx="18" ry="10" />
+        <path d="M148 37 L146 26 M160 37 L162 26 M46 122 L32 138" />
+        <circle cx="78" cy="122" r="4" /><circle cx="98" cy="132" r="4" /><circle cx="136" cy="84" r="3" />
+      </svg>
+      <div class="meter">
+        <div class="row"><span class="pct">81%</span><span class="line">blaze at 75%</span></div>
+        <div class="bar"><i></i><b></b></div>
+      </div>
+    </div>
+
+    <div class="stamp">
+      <svg viewBox="0 0 256 256"><path fill="#ff5a1f" d="M143.38,17.85a8,8,0,0,0-12.63,3.41l-22,60.41L84.59,58.26a8,8,0,0,0-11.93.89C51,87.53,40,116.08,40,144a88,88,0,0,0,176,0C216,84.55,165.21,36,143.38,17.85Zm40.51,135.49a57.6,57.6,0,0,1-46.56,46.55A7.65,7.65,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z"/></svg>
+      <div>Blazed!<small>giraffe in 12.4s</small></div>
+    </div>
+  </body>
+</html>

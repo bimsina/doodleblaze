@@ -10,35 +10,20 @@ export function useNow(now: () => number, ms = 200) {
   return t
 }
 
-export function TimerRing({ endsAt, totalMs, now }: { endsAt: number; totalMs: number; now: () => number }) {
+/** Seconds left in a solid circle; turns orange and wiggles for the last ten. */
+export function TimerBadge({ endsAt, now }: { endsAt: number; now: () => number }) {
   const t = useNow(now)
-  const left = Math.max(0, endsAt - t)
-  const secs = Math.ceil(left / 1000)
-  const frac = Math.min(1, left / totalMs)
+  const secs = Math.max(0, Math.ceil((endsAt - t) / 1000))
   const urgent = secs <= 10
-  const r = 22
   return (
-    <div className={`relative size-16 ${urgent && secs > 0 ? 'animate-wiggle' : ''}`} key={urgent ? secs : 'calm'}>
-      <svg viewBox="0 0 52 52" className="size-full -rotate-90">
-        <circle cx="26" cy="26" r={r} fill="#fffdf9" stroke="#1d1b18" strokeWidth="2.5" />
-        <circle
-          cx="26"
-          cy="26"
-          r={r - 5}
-          fill="none"
-          stroke={urgent ? '#ff5a1f' : '#ffc23d'}
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={2 * Math.PI * (r - 5)}
-          strokeDashoffset={2 * Math.PI * (r - 5) * (1 - frac)}
-          style={{ transition: 'stroke-dashoffset 200ms linear' }}
-        />
-      </svg>
-      <span
-        className={`absolute inset-0 flex items-center justify-center font-display text-lg font-extrabold tabular-nums ${urgent ? 'text-blaze' : 'text-ink'}`}
-      >
-        {secs}
-      </span>
-    </div>
+    <span
+      key={urgent ? secs : 'calm'}
+      className={`flex size-16 shrink-0 items-center justify-center rounded-full font-display text-2xl font-extrabold tabular-nums text-white sm:size-20 sm:text-3xl ${
+        urgent ? 'animate-wiggle bg-blaze' : 'bg-ink'
+      }`}
+      aria-label={`${secs} seconds left`}
+    >
+      {secs}
+    </span>
   )
 }
