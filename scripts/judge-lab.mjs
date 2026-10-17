@@ -1,4 +1,4 @@
-// Tunes Drishti against synthetic doodles. Needs `pnpm dev` with LAB_ENABLED=1 in .dev.vars.
+// Tunes Drishti against synthetic doodles. Needs `pnpm dev` with LAB_ENABLED=1 in .env.local.
 // Usage: node scripts/judge-lab.mjs <outDir> '<json-spec>'
 // spec: [{ word, drawings: [names], model, crop, temperature, verdict }]
 import { writeFileSync, mkdirSync } from 'node:fs'

@@ -49,7 +49,7 @@ type LabBody = {
   verdict?: boolean
 }
 
-// Developer-only endpoint for tuning the judge. Enabled with LAB_ENABLED=1 in .dev.vars.
+// Developer-only endpoint for tuning the judge. Enabled with LAB_ENABLED=1 in .env.local.
 async function lab(request: Request, url: URL) {
   if (env.LAB_ENABLED !== '1' || request.method !== 'POST' || url.pathname !== '/api/lab/judge') {
     return new Response('Not found', { status: 404 })

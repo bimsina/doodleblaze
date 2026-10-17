@@ -33,7 +33,7 @@ Workers AI always runs remotely, so `pnpm dev` needs `wrangler login` and uses r
 
 ### Tuning the judge
 
-With `LAB_ENABLED=1` in `.dev.vars`, the dev server exposes `POST /api/lab/judge`, and rooms accept a `word:<word>` pack to force the next prompt. Run synthetic doodles through it:
+With `LAB_ENABLED=1` in `.env.local`, the dev server exposes `POST /api/lab/judge`, and rooms accept a `word:<word>` pack to force the next prompt. Run synthetic doodles through it:
 
 ```bash
 node scripts/judge-lab.mjs /tmp/lab '[{"word":"cat","drawings":["cat_2_ears","cat_4_whiskers","written_cat","scribble"],"verdict":true}]'
