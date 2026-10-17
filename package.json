@@ -2,6 +2,7 @@
 	"name": "doodleblaze",
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@12.14.0",
 	"imports": {
 		"#/*": "./src/*"
 	},
@@ -40,13 +41,5 @@
 		"typescript": "^6.0.2",
 		"vite": "^8.0.0",
 		"wrangler": "^4.151.0"
-	},
-	"pnpm": {
-		"onlyBuiltDependencies": [
-			"esbuild",
-			"lightningcss",
-			"sharp",
-			"workerd"
-		]
 	}
 }
