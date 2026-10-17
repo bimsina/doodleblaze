@@ -102,6 +102,17 @@ With `LAB_ENABLED=1` in `.env.local`, the dev server exposes `POST /api/lab/judg
 node scripts/judge-lab.mjs /tmp/lab '[{"word":"cat","drawings":["cat_2_ears","cat_4_whiskers","written_cat","scribble"],"verdict":true}]'
 ```
 
+Every pack word has a test doodle in `scripts/doodles/` (one module per pack, drawn with the small pen in `kit.mjs`). Look at them exactly as Drishti sees them, then check them against local Clef:
+
+```bash
+node --import ./scripts/ts-hooks.mjs scripts/doodles/preview.mjs /tmp/doodles sea food   # PNGs and a contact sheet per pack
+node --import ./scripts/ts-hooks.mjs scripts/word-check.mjs /tmp/words.json             # every word; or name packs or words
+```
+
+`word-check` judges each word's doodle twice: alone, and in one batch with doodles of its look-alikes, like a busy round (scores shift by 15 points or so with the company a drawing keeps). A word passes when its own doodle blazes both times and none of the look-alikes' doodles do. It refuses to run unless the dev server uses local Clef, and it skips words whose doodles and look-alikes haven't changed since the last run.
+
+The last full check (local Clef, October 2026) passed 380 of the 409 words. The other 29 are near misses: Clef's top pick is the word, but under 75% alone or in a crowd. Getting there cut words Clef never recognized from an honest doodle (nose, piano, walrus, screwdriver and a few more) and swapped look-alikes that were just a broader word (police car no longer has car, golden egg no longer has egg) or that Clef couldn't tell apart (hammer's axe is now a golf club).
+
 Prompt packs and distractors live in `src/shared/prompts.ts`; timings and scoring in `src/shared/protocol.ts`.
 
 The share image (`public/og.png`) and app icons are rendered from `scripts/brand/*.html` with headless Chrome: `bash scripts/brand/render.sh`. Icons in the UI are [Phosphor](https://phosphoricons.com).
