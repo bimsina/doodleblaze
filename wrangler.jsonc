@@ -21,7 +21,8 @@
 		// About $0.70 a day at most (a 4-drawing check is ~$0.00023). Past this, new games pause until midnight UTC.
 		"JUDGE_PER_DAY": "3000",
 		// "live" calls Clef. "mock" makes up judgements for free (no API calls); .env.local sets it for local dev.
-		"JUDGE_MODE": "live"
+		"JUDGE_MODE": "live",
+		"CLEF_PROVIDER": "cloudflare"
 	},
 	"kv_namespaces": [
 		{

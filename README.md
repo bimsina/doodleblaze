@@ -19,7 +19,7 @@ Live at **https://doodleblaze.bimsina.dev**. Runs entirely on Cloudflare.
 - **Worker** (`src/server.ts`): TanStack Start app plus a small API: `POST /api/rooms` creates a room, `/api/rooms/:code/ws` joins it.
 - **Room Durable Object** (`src/server/room.ts`): one per room code. Holds the game state, the WebSocket connections, the phase timers (alarms), and the judging loop.
 - **Strokes, not images.** Clients stream pen strokes; the room rasterizes them server-side into a 256×256 grayscale PNG (`src/server/raster.ts`). Nobody can upload a photo, and messages stay tiny.
-- **Drishti** (`src/server/judge.ts`): Cloudflare's [Clef](https://developers.cloudflare.com/workers-ai/models/clef/) decision model on Workers AI. Each check asks one `choice` question per drawing: the word, three look-alike distractors, "something else", "scribble" and "written words". The meter is the word's probability, sharpened with temperature 0.7. Writing the word scores 0 because "written words" wins.
+- **Drishti** (`src/server/judge.ts`): Cloudflare's [Clef](https://developers.cloudflare.com/workers-ai/models/clef/) decision model, on Workers AI in production (or on a local Ollama in dev, see below). Each check asks one `choice` question per drawing: the word, three look-alike distractors, "something else", "scribble" and "written words". The meter is the word's probability, sharpened with temperature 0.7. Writing the word scores 0 because "written words" wins.
   - Changed canvases are judged at most every 1.5 s, and only once the pen lifts (or a stroke runs past 1.5 s). Up to 4 drawings go in one Clef request.
   - Winners are ordered by when their strokes arrived, not by when Clef answered.
   - Reveal cards reuse the last live check for free ("Definitely a cat", "70% sure this is a fox"). Only drawings filed under "something else" get one more look, against 40 random words, which produces the "8% sure this is a boomerang" verdicts.
@@ -77,7 +77,22 @@ pnpm install
 pnpm dev
 ```
 
-Copy `.env.example` to `.env.local`. Its `JUDGE_MODE=mock` makes Drishti free locally: no Clef calls, and meters climb with how much you've drawn (plus some noise), so rounds can still be won. Set `JUDGE_MODE=live` and restart `pnpm dev` to test the real judge; Workers AI always runs remotely, so live mode needs `wrangler login` and is billed. Production uses `live` from `wrangler.jsonc`.
+Copy `.env.example` to `.env.local`. Its `JUDGE_MODE=mock` makes Drishti free locally: no Clef calls, and meters climb with how much you've drawn (plus some noise), so rounds can still be won. Set `JUDGE_MODE=live` and restart `pnpm dev` to use the real judge, from the provider `CLEF_PROVIDER` names:
+
+| `CLEF_PROVIDER` | Where Clef runs                                                                                                     | Cost   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------- | ------ |
+| `ollama`        | Any [System One](https://ollama.com/library/clef) endpoint at `CLEF_URL` (`/v1/systemone`), by default a local Ollama | Free   |
+| `cloudflare`    | Workers AI through the AI Gateway. Always remote, even in dev, so it needs `wrangler login`                         | Billed |
+
+Production uses `live` and `cloudflare` from `wrangler.jsonc`; `.env.example` defaults to `ollama`, so switching to live mode locally never spends money by accident. `CLEF_API_KEY` is sent as a bearer token, for a hosted System One endpoint that wants one.
+
+### Local Clef
+
+```bash
+ollama pull clef   # about 18 GB; needs roughly 20 GB of free memory to run
+```
+
+Then set `JUDGE_MODE=live` and `CLEF_PROVIDER=ollama` in `.env.local` and restart `pnpm dev`. It counts tokens the same way as Workers AI (290 for one drawing), but it may not be the exact same build, so treat local scores as a close guide rather than a promise. On an M2 Max a check takes about 3 s for one drawing and 10 s for a batch of four (the first one loads the model, up to 2 minutes), so local meters move slower than in production. Ollama caps a choice question at 26 options, so reveal guesses use 26 random words instead of 40.
 
 ### Tuning the judge
 

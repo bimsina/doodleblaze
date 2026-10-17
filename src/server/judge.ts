@@ -1,4 +1,6 @@
 // Drishti: asks Cloudflare's Clef decision model what a doodle depicts.
+// CLEF_PROVIDER picks who runs Clef: Workers AI (production) or any System One
+// endpoint, such as a local Ollama with `ollama pull clef`.
 
 import { env } from 'cloudflare:workers'
 import { OTHER, SCRIBBLE, slug, WRITING } from '#/shared/prompts'
@@ -47,6 +49,15 @@ export type BatchResult = { judgements: Judgement[]; ms: number; inputTokens: nu
 
 /** `JUDGE_MODE=mock` (the local default) makes up judgements for free instead of calling Clef. */
 export const judgeMode = () => (env.JUDGE_MODE === 'mock' ? 'mock' : 'live')
+
+/**
+ * `cloudflare`: Clef on Workers AI through the AI Gateway (billed).
+ * `ollama`: Clef behind a System One API at CLEF_URL, by default a local Ollama (free).
+ */
+export const clefProvider = () => (env.CLEF_PROVIDER === 'ollama' ? 'ollama' : 'cloudflare')
+
+/** Most options one choice question may have. Ollama's System One API allows 26; Workers AI takes the 40-word reveal list. */
+const maxOptions = () => (clefProvider() === 'ollama' ? 26 : Infinity)
 
 /** Labels in the order Clef sees them. Shuffle once per round and reuse it, so every player gets the same question. */
 export function optionsFor(prompt: PromptWord, shuffle = true): string[] {
@@ -148,6 +159,7 @@ export function toJudgement(
  * come from. 150 words cost 3,370 tokens (14 judged drawings), so keep the list short.
  */
 export async function verdict(ai: Ai, model: ClefModel, image: string, vocabulary: string[], room: string) {
+  vocabulary = vocabulary.slice(0, maxOptions())
   if (judgeMode() === 'mock') return mockVerdict(image, vocabulary)
   const criteria: Record<string, string> = {}
   for (const word of vocabulary) criteria[slug(word)] = word
@@ -162,11 +174,29 @@ export async function verdict(ai: Ai, model: ClefModel, image: string, vocabular
   return { label, p: round3(a.probabilities[a.choice] ?? 0) }
 }
 
-/** Every call goes through the AI Gateway, tagged so its logs and spend can be split by room and kind. */
+/** On Workers AI every call goes through the AI Gateway, tagged so its logs and spend can be split by room and kind. */
 function runClef(ai: Ai, input: ClefInput, metadata: Record<string, string | number>): Promise<ClefOutput> {
+  if (clefProvider() === 'ollama') return runSystemOne(input)
   // Clef isn't in the generated Workers AI model types yet.
   const run = ai.run.bind(ai) as unknown as (model: string, input: ClefInput, options: AiOptions) => Promise<ClefOutput>
   return run(`@cf/cloudflare/${input.model}`, input, { gateway: { id: env.AI_GATEWAY, metadata } })
+}
+
+/** Clef on a System One API (`POST /v1/systemone`), such as Ollama's. It takes images as bare base64, not data URLs. */
+async function runSystemOne(input: ClefInput): Promise<ClefOutput> {
+  const key = env.CLEF_API_KEY
+  const res = await fetch(`${env.CLEF_URL || 'http://localhost:11434'}/v1/systemone`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
+    body: JSON.stringify({
+      ...input,
+      images: input.images?.map((image) => image.slice(image.indexOf(',') + 1)),
+      // Clef is big; keep it loaded between rounds.
+      keep_alive: '30m',
+    }),
+  })
+  if (!res.ok) throw new Error(`Clef (${env.CLEF_URL || 'local Ollama'}) answered ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  return res.json<ClefOutput>()
 }
 
 // Re-tempering probabilities is equivalent to dividing Clef's logits by T.
