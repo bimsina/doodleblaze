@@ -8,7 +8,7 @@ export const Route = createFileRoute('/')({ component: Home })
 
 const STEPS = [
   { title: 'Same word, same time', body: 'Everyone gets the prompt at once. Nobody waits for a turn.' },
-  { title: 'Drishti watches live', body: 'An AI judge checks every canvas as you draw. Your meter shows how sure it is.' },
+  { title: 'Drishti watches live', body: 'Drishti looks at every canvas as you draw. Your meter shows how sure it is.' },
   { title: 'Cross 75% to blaze', body: 'The first drawing Drishti recognizes wins the round. Five rounds, about five minutes.' },
 ]
 
@@ -60,16 +60,8 @@ function Home() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-6xl flex-col px-4 pt-6 pb-10 sm:px-8">
-      <header className="flex items-center justify-between">
+      <header>
         <Logo />
-        <a
-          href="https://developers.cloudflare.com/workers-ai/models/clef/"
-          className="hidden text-sm font-semibold text-ink-soft hover:text-ink sm:block"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Judged by Clef on Workers AI
-        </a>
       </header>
 
       <section className="grid flex-1 items-center gap-8 py-6 sm:gap-10 sm:py-10 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
@@ -86,7 +78,7 @@ function Home() {
             .
           </h1>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-ink-soft sm:mt-6 sm:text-lg">
-            Everyone draws the same word at the same time while Drishti, our AI judge, watches every canvas. The first
+            Everyone draws the same word at the same time while Drishti, the judge, watches every canvas. The first
             drawing it recognizes wins the round. Stick figures welcome.
           </p>
           <div className="mt-8 hidden items-center gap-3 text-sm font-semibold text-ink-soft sm:flex">

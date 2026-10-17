@@ -4,6 +4,14 @@ A multiplayer drawing race. Everyone draws the same word at the same time while 
 
 Live at **https://doodleblaze.bimsina.dev**. Runs entirely on Cloudflare.
 
+## Built with
+
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) with [TanStack Start](https://tanstack.com/start) (React, SSR)
+- [Durable Objects](https://developers.cloudflare.com/durable-objects/) for rooms: WebSockets, alarms, SQLite-backed state
+- [Workers AI](https://developers.cloudflare.com/workers-ai/) running [Clef](https://developers.cloudflare.com/workers-ai/models/clef/), Cloudflare's decision model, as the judge
+- [Workers Builds](https://developers.cloudflare.com/workers/ci-cd/builds/) for deploys from GitHub
+- Tailwind CSS v4
+
 ## How it works
 
 - **Worker** (`src/server.ts`): TanStack Start app plus a small API: `POST /api/rooms` creates a room, `/api/rooms/:code/ws` joins it.

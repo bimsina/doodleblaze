@@ -3,7 +3,7 @@ import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import appCss from '../styles.css?url'
 
 const DESCRIPTION =
-  'A multiplayer drawing race. Everyone draws the same word, an AI judge watches every canvas, and the first drawing it recognizes wins.'
+  'A drawing race with friends. Everyone draws the same word, Drishti watches every canvas, and the first drawing it recognizes wins.'
 
 export const Route = createRootRoute({
   head: () => ({
