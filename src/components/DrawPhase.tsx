@@ -28,7 +28,7 @@ export function DrawPhase({ room }: { room: RoomConnection }) {
   const line = lineFor(mood, seed, word, room.judge?.guess ?? null)
 
   const onPoints = useCallback(
-    (id: number, e: boolean, p: number[]) => room.send({ t: 'stroke', id, e, p }),
+    (id: number, e: boolean, p: number[], end: boolean) => room.send({ t: 'stroke', id, e, p, ...(end && { end }) }),
     [room.send],
   )
   const onUndo = useCallback(() => room.send({ t: 'undo' }), [room.send])

@@ -26,5 +26,5 @@ for (const spec of JSON.parse(specJson)) {
     )
     writeFileSync(`${outDir}/${name}.png`, Buffer.from(r.images[i].dataUrl.split(',')[1], 'base64'))
   })
-  console.log(`   -> ${r.ms} ms, ${r.inputTokens} tokens, render ${r.renderMs} ms, ${r.images.map((i) => i.bytes).join('/')} bytes`)
+  console.log(`   -> [${r.mode}] ${r.ms} ms, ${r.inputTokens} tokens, render ${r.renderMs} ms, ${r.images.map((i) => i.bytes).join('/')} bytes`)
 }

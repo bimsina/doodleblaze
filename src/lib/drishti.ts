@@ -33,6 +33,8 @@ export function lineFor(mood: Mood, seed: number, word: string, guess: string | 
 export function verdictLine(label: string, p: number, word: string): string {
   const pct = Math.round(p * 100)
   if (label === word) return pct >= 60 ? `Definitely a ${word}.` : `${pct}% sure it’s a ${word}.`
+  if (label === 'scribble') return 'Drishti saw… scribbles.'
+  if (label === 'writing') return 'That’s just writing. Nice try.'
   return `${pct}% sure this is ${article(label)} ${label}.`
 }
 

@@ -75,7 +75,8 @@ export type RoomSnapshot = {
 }
 
 export type ClientMessage =
-  | { t: 'stroke'; id: number; e: boolean; p: number[] }
+  /** `end` marks the pen lifting; the stroke's last points may come with it. */
+  | { t: 'stroke'; id: number; e: boolean; p: number[]; end?: boolean }
   | { t: 'undo' }
   | { t: 'sync'; round: number; strokes: Stroke[] }
   | { t: 'pack'; pack: string }

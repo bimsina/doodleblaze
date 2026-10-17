@@ -4,8 +4,8 @@
 
 import { DurableObject } from 'cloudflare:workers'
 
-/** A room's fastest judging pace. */
-export const BASE_TICK_MS = 1_000
+/** A room's fastest judging pace. Each tick judges every changed canvas, so this sets most of the bill. */
+export const BASE_TICK_MS = 1_500
 /** Its slowest pace, when the budget is stretched thin. */
 const MAX_TICK_MS = 8_000
 /** Requests that can go out back to back before the per-minute pace applies. */

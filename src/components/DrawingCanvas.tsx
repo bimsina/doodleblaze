@@ -12,13 +12,14 @@ export type CanvasHandle = {
 type Props = {
   tool: Tool
   disabled?: boolean
-  /** Streams points of the stroke being drawn; same id appends to the same stroke. */
-  onPoints: (id: number, eraser: boolean, points: number[]) => void
+  /** Streams points of the stroke being drawn; same id appends to the same stroke. `end` is the pen lifting. */
+  onPoints: (id: number, eraser: boolean, points: number[], end: boolean) => void
   onUndo: () => void
   onInkChange?: (hasInk: boolean) => void
 }
 
-const FLUSH_MS = 120
+// Drishti looks at most every ~1.5 s and waits for the pen to lift, so there's no need to stream faster.
+const FLUSH_MS = 250
 const MIN_STEP = 3
 
 export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCanvas(
@@ -87,16 +88,19 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
     return () => ro.disconnect()
   }, [redraw])
 
-  const flush = useCallback(() => {
-    const a = activeRef.current
-    if (!a || a.pending.length === 0) return
-    const s = strokesRef.current[a.id]
-    onPoints(a.id, s.e, a.pending)
-    a.pending = []
-  }, [onPoints])
+  const flush = useCallback(
+    (end = false) => {
+      const a = activeRef.current
+      if (!a || (a.pending.length === 0 && !end)) return
+      const s = strokesRef.current[a.id]
+      onPoints(a.id, s.e, a.pending, end)
+      a.pending = []
+    },
+    [onPoints],
+  )
 
   useEffect(() => {
-    const t = setInterval(flush, FLUSH_MS)
+    const t = setInterval(() => flush(), FLUSH_MS)
     return () => clearInterval(t)
   }, [flush])
 
@@ -153,13 +157,13 @@ export const DrawingCanvas = forwardRef<CanvasHandle, Props>(function DrawingCan
   const endStroke = (e: React.PointerEvent) => {
     const a = activeRef.current
     if (!a || a.pointer !== e.pointerId) return
-    flush()
+    flush(true)
     activeRef.current = null
   }
 
   useEffect(() => {
     if (disabled && activeRef.current) {
-      flush()
+      flush(true)
       activeRef.current = null
     }
   }, [disabled, flush])

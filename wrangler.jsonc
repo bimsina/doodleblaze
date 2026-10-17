@@ -18,8 +18,10 @@
 		"AI_GATEWAY": "doodleblaze",
 		// Clef requests shared by all rooms. Workers AI allows 300 a minute per account.
 		"JUDGE_PER_MINUTE": "240",
-		// About $5 a day at most (judge ~$0.00033, verdict ~$0.0008 each). Past this, new games pause until midnight UTC.
-		"JUDGE_PER_DAY": "15000"
+		// About $0.70 a day at most (a 4-drawing check is ~$0.00023). Past this, new games pause until midnight UTC.
+		"JUDGE_PER_DAY": "3000",
+		// "live" calls Clef. "mock" makes up judgements for free (no API calls); .env.local sets it for local dev.
+		"JUDGE_MODE": "live"
 	},
 	"kv_namespaces": [
 		{

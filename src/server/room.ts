@@ -28,6 +28,7 @@ import type {
 import { DEFAULT_PACK, findWord, getPack, PACKS, VOCABULARY } from '#/shared/prompts'
 import { BASE_TICK_MS, isResting, takeBudget } from '#/server/budget'
 import { judgeBatch, optionsFor, verdict } from '#/server/judge'
+import type { Judgement } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
 
 const MODEL = 'clef'
@@ -39,6 +40,10 @@ const IDLE_CLEANUP_MS = 30 * 60_000
 const DRAIN_MS = 4_000
 /** Below this, a timed-out round has no winner at all. */
 const MIN_CONSOLATION_METER = 0.1
+/** A stroke still being drawn is judged only once it has gone on this long; otherwise Drishti waits for the pen to lift. */
+const LONG_STROKE_MS = 1_500
+/** Words a "something else" drawing is compared against at the reveal. Cost grows with the list. */
+const VERDICT_WORDS = 40
 
 type Player = {
   id: string
@@ -75,6 +80,11 @@ type Canvas = {
   judgedVersion: number
   inFlight: boolean
   meter: number
+  /** When the stroke being drawn started; null once the pen lifts. */
+  strokeStartedAt: number | null
+  /** Drishti's top pick at the last check, reused for the reveal card. */
+  top: string | null
+  topP: number
 }
 
 type Attachment = { playerId: string }
@@ -358,7 +368,9 @@ export class Room extends DurableObject<Env> {
       active.map(async (p) => {
         const canvas = this.canvases.get(p.id)
         const image = await renderStrokes(canvas?.strokes ?? [])
-        return { playerId: p.id, image: image.dataUrl, meter: canvas?.meter ?? 0, blank: image.empty }
+        const drawing: Drawing = { playerId: p.id, image: image.dataUrl, meter: canvas?.meter ?? 0, blank: image.empty }
+        if (canvas && !image.empty) drawing.verdict = liveVerdict(canvas, state.word!)
+        return drawing
       }),
     )
     state.result = { round: state.round, word: state.word!, winnerId, reason, winMs, drawings }
@@ -367,19 +379,27 @@ export class Room extends DurableObject<Env> {
     this.ctx.waitUntil(this.addVerdicts(state.round))
   }
 
-  /** Drishti's honest opinion of every drawing, against its whole vocabulary. */
+  /**
+   * Most reveal cards reuse the last live check for free (see liveVerdict).
+   * Only drawings Drishti filed under "something else" get one more look,
+   * against a short random sample of other words.
+   */
   private async addVerdicts(round: number) {
-    const result = this.state?.result
-    if (!result) return
-    const code = this.state!.code
-    const drawn = result.drawings.filter((d) => !d.blank)
-    if (!drawn.length) return
+    const state = this.state
+    const result = state?.result
+    if (!state || !result) return
+    const unknown = result.drawings.filter((d) => !d.blank && !d.verdict)
+    if (!unknown.length) return
+    const words = sample(
+      VOCABULARY.filter((w) => !state.options.includes(w)),
+      VERDICT_WORDS,
+    )
     // Always granted: a handful per round. Counting them makes busy rooms slow down to make room.
-    await takeBudget(this.env, drawn.length, this.tickMs, true)
+    await takeBudget(this.env, unknown.length, this.tickMs, true)
     await Promise.all(
-      drawn.map(async (d) => {
+      unknown.map(async (d) => {
         try {
-          const v = await verdict(this.env.AI, MODEL, d.image, VOCABULARY, code)
+          const v = await verdict(this.env.AI, MODEL, d.image, words, state.code)
           if (this.state?.result?.round !== round) return
           d.verdict = v
           this.broadcast({ t: 'verdict', round, playerId: d.playerId, label: v.label, p: v.p })
@@ -430,7 +450,18 @@ export class Room extends DurableObject<Env> {
     if (this.state?.phase !== 'drawing' || player.waiting || this.pending) return null
     let canvas = this.canvases.get(player.id)
     if (!canvas) {
-      canvas = { strokes: [], points: 0, version: 0, changedAt: 0, judgedVersion: 0, inFlight: false, meter: 0 }
+      canvas = {
+        strokes: [],
+        points: 0,
+        version: 0,
+        changedAt: 0,
+        judgedVersion: 0,
+        inFlight: false,
+        meter: 0,
+        strokeStartedAt: null,
+        top: null,
+        topP: 0,
+      }
       this.canvases.set(player.id, canvas)
     }
     return canvas
@@ -438,18 +469,24 @@ export class Room extends DurableObject<Env> {
 
   private onStroke(player: Player, msg: Extract<ClientMessage, { t: 'stroke' }>) {
     const canvas = this.canvasFor(player)
-    const points = cleanPoints(msg.p)
+    // The pen-up message may carry no new points.
+    const points = Array.isArray(msg.p) && msg.p.length === 0 ? [] : cleanPoints(msg.p)
     if (!canvas || !points) return
     if (canvas.points + points.length / 2 > MAX_POINTS) return
-    if (msg.id === canvas.strokes.length && canvas.strokes.length < MAX_STROKES) {
-      canvas.strokes.push({ e: msg.e === true, p: points })
-    } else if (msg.id === canvas.strokes.length - 1) {
-      canvas.strokes[msg.id].p.push(...points)
-    } else {
-      return
+    if (points.length) {
+      if (msg.id === canvas.strokes.length && canvas.strokes.length < MAX_STROKES) {
+        canvas.strokes.push({ e: msg.e === true, p: points })
+        canvas.strokeStartedAt = Date.now()
+      } else if (msg.id === canvas.strokes.length - 1) {
+        canvas.strokes[msg.id].p.push(...points)
+      } else {
+        return
+      }
+      canvas.points += points.length / 2
     }
-    canvas.points += points.length / 2
-    this.touch(canvas)
+    if (msg.end === true) canvas.strokeStartedAt = null
+    if (points.length) this.touch(canvas)
+    else this.scheduleJudge()
   }
 
   private onUndo(player: Player) {
@@ -483,19 +520,43 @@ export class Room extends DurableObject<Env> {
   // --- Judging ---
 
   private scheduleJudge() {
-    if (this.judgeTimer || this.finalizing || this.state?.phase !== 'drawing' || !this.unjudged().length) return
-    const wait = Math.max(0, this.lastTickAt + this.tickMs - Date.now())
+    if (this.judgeTimer || this.finalizing || this.state?.phase !== 'drawing') return
+    const now = Date.now()
+    let wait = Math.max(0, this.lastTickAt + this.tickMs - now)
+    if (!this.unjudged().length) {
+      // Only mid-stroke canvases are waiting. Look again once the oldest open
+      // stroke counts as long, in case its pen-up never arrives (a dropped
+      // message, or a tab still running an older client).
+      const before = this.pending?.at ?? Infinity
+      const due = [...this.canvases.values()]
+        .filter((c) => c.version !== c.judgedVersion && !c.inFlight && c.changedAt < before && c.strokeStartedAt !== null)
+        .map((c) => c.strokeStartedAt! + LONG_STROKE_MS + 10)
+      if (!due.length) return
+      wait = Math.max(wait, Math.min(...due) - now)
+    }
     this.judgeTimer = setTimeout(() => {
       this.judgeTimer = null
       void this.judgeTick()
     }, wait)
   }
 
-  /** Changed canvases waiting for Drishti, oldest change first. Once someone has blazed, only ones drawn before that can still win. */
-  private unjudged() {
+  /**
+   * Changed canvases waiting for Drishti, oldest change first. Mid-stroke
+   * canvases wait for the pen to lift (or a long stroke), which saves checks
+   * on half-drawn lines. Once someone has blazed, only ones drawn before that
+   * can still win. `final` (time's up) takes everything.
+   */
+  private unjudged(final = false) {
     const before = this.pending?.at ?? Infinity
+    const now = Date.now()
     return [...this.canvases.entries()]
-      .filter(([, c]) => c.version !== c.judgedVersion && !c.inFlight && c.changedAt < before)
+      .filter(
+        ([, c]) =>
+          c.version !== c.judgedVersion &&
+          !c.inFlight &&
+          c.changedAt < before &&
+          (final || c.strokeStartedAt === null || now - c.strokeStartedAt > LONG_STROKE_MS),
+      )
       .sort((a, b) => a[1].changedAt - b[1].changedAt)
   }
 
@@ -504,12 +565,12 @@ export class Room extends DurableObject<Env> {
     if (!state?.word || (!final && (state.phase !== 'drawing' || this.finalizing))) return
     const round = state.round
     this.lastTickAt = Date.now()
-    const want = Math.ceil(this.unjudged().length / BATCH_SIZE)
-    if (!want) return
+    const want = Math.ceil(this.unjudged(final).length / BATCH_SIZE)
+    if (!want) return this.scheduleJudge()
     const { granted, tickMs } = await takeBudget(this.env, want, this.tickMs, final)
     this.tickMs = tickMs
     if (this.state?.round !== round || (!final && this.finalizing)) return
-    const ready = this.unjudged().slice(0, granted * BATCH_SIZE)
+    const ready = this.unjudged(final).slice(0, granted * BATCH_SIZE)
     for (let i = 0; i < ready.length; i += BATCH_SIZE) this.launch(ready.slice(i, i + BATCH_SIZE))
     // Whatever the budget held back goes out on a later tick.
     this.scheduleJudge()
@@ -541,7 +602,7 @@ export class Room extends DurableObject<Env> {
     const meters: Record<string, number> = {}
     // Blank canvases score 0 without asking Clef.
     for (const [i, s] of snapshots.entries()) {
-      if (rendered[i].empty) this.applyJudgement(s, 0, null, false, meters)
+      if (rendered[i].empty) this.applyJudgement(s, null, meters)
     }
     if (toJudge.length) {
       try {
@@ -554,10 +615,7 @@ export class Room extends DurableObject<Env> {
           state.code,
         )
         if (this.state?.word !== prompt.word) return
-        toJudge.forEach(({ s }, i) => {
-          const j = judgements[i]
-          this.applyJudgement(s, j.meter, j.guess, j.writing > 0.5, meters)
-        })
+        toJudge.forEach(({ s }, i) => this.applyJudgement(s, judgements[i], meters))
       } catch (err) {
         console.error('judge failed', err)
         // Back off a little; probably rate limited.
@@ -567,18 +625,20 @@ export class Room extends DurableObject<Env> {
     if (Object.keys(meters).length) this.broadcast({ t: 'meters', meters })
   }
 
+  /** `j` is null for a blank canvas. */
   private applyJudgement(
     s: { playerId: string; canvas: Canvas; version: number; at: number },
-    meter: number,
-    guess: string | null,
-    writing: boolean,
+    j: Judgement | null,
     meters: Record<string, number>,
   ) {
     if (s.version < s.canvas.judgedVersion) return
+    const meter = j?.meter ?? 0
     s.canvas.judgedVersion = s.version
     s.canvas.meter = meter
+    s.canvas.top = j?.top ?? null
+    s.canvas.topP = j?.topP ?? 0
     meters[s.playerId] = meter
-    this.sendTo(s.playerId, { t: 'judge', meter, guess, writing })
+    this.sendTo(s.playerId, { t: 'judge', meter, guess: j?.guess ?? null, writing: j?.top === 'writing' })
     if (meter >= BLAZE_THRESHOLD && (!this.pending || s.at < this.pending.at)) {
       this.pending = { playerId: s.playerId, at: s.at }
     }
@@ -686,6 +746,22 @@ function cleanPoints(p: unknown): number[] | null {
     out[i] = Math.min(COORD_MAX, Math.max(0, Math.round(v)))
   }
   return out
+}
+
+/** The reveal card's line, straight from the last live check, when it says enough. */
+function liveVerdict(canvas: Canvas, word: string): Drawing['verdict'] {
+  if (canvas.meter >= BLAZE_THRESHOLD) return { label: word, p: canvas.meter }
+  if (!canvas.top || canvas.top === 'something else') return undefined
+  return { label: canvas.top, p: canvas.topP }
+}
+
+function sample<T>(items: T[], n: number): T[] {
+  const copy = [...items]
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy.slice(0, n)
 }
 
 function freeColor(players: Player[]) {

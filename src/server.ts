@@ -3,7 +3,7 @@ import handler from '@tanstack/react-start/server-entry'
 import { findWord, VOCABULARY } from '#/shared/prompts'
 import type { Stroke } from '#/shared/protocol'
 import { budgetStatus, isResting } from '#/server/budget'
-import { judgeBatch, optionsFor, verdict } from '#/server/judge'
+import { judgeBatch, judgeMode, optionsFor, verdict } from '#/server/judge'
 import type { ClefModel } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
 
@@ -90,6 +90,7 @@ async function lab(request: Request, url: URL) {
     : undefined
   return Response.json({
     model,
+    mode: judgeMode(),
     renderMs,
     ...result,
     verdicts,
