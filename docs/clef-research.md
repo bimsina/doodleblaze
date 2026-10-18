@@ -30,6 +30,21 @@ Doodleblaze's judge, Drishti, is Cloudflare's [Clef](https://developers.cloudfla
 - **The batched final run cleared the bar with room to spare.** Each word's own doodle scored at least 75% alone and 76% in a batch (medians 99% and 98%). The 806 look-alike doodles judged against the words they stand in for scored a median of 2% and never blazed (highest 74%), and no scribble got past 69%.
 - **Judged one drawing per request, as rooms now do, every word still passes.** Own doodles scored at least 75% (median 99%), the 806 look-alike doodles at most 70% (median 0%), and scribbles at most 3%, down from 69% in batches. Four look-alikes changed on the way, because judged alone their doodle won: a lantern read 82% as padlock, an iron 80% as shoe, a leg 76% as boot and a fire extinguisher 89% as jetpack.
 
+## The new packs
+
+Four packs were new this round, built around themes the original packs only touched: space and robots, Halloween, the body, and work tools. Space and magic words moved out of Make-believe into Sci-fi & space and Spooky, and hammer moved from Around the house to Tools of the trade. Every new word had to be general (no regional dishes or festivals), drawable in under a minute, free of letters, and never paired with a broader word for itself.
+
+| Pack               | Words | Cut | Median score | What Clef couldn't take                                                                                                                                                                                                                 |
+| ------------------ | ----- | --- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sci-fi & space     | 22    | 9   | 98%          | Machines built from the same parts as their look-alikes: a space shuttle is a rocket or a plane, a robot arm a desk lamp, a drone a spider, a space station a windmill. Black holes and craters reached the line only some of the time. |
+| Spooky             | 25    | 2   | 98%          | A scythe and a lantern only reached 75% alone or in a batch, never both. Everything else (vampire, mummy, werewolf, grim reaper, zombie hand) passed.                                                                                   |
+| Head to toe        | 22    | 5   | 99%          | Body parts with no face or person around them: a nose read as a hook, a foot and a leg as a boot, a braid as a caterpillar. Faces (smiley, sad, angry, surprised, crying) all passed.                                                   |
+| Tools of the trade | 28    | 4   | 96%          | Small tools that collapse into their silhouette: a screwdriver is a toothbrush, a nail a pin. A toolbox read as a treasure chest and a fire extinguisher as a bottle. Medical and lab kit passed.                                       |
+
+The median score is each word's own doodle, judged on its own as rooms now judge, in the final run. The lowest word in any of the four packs scored 77%.
+
+Packs considered and folded into existing ones instead: town and street things (in Great outdoors and Tools of the trade), school and office supplies (Around the house), weather (Great outdoors).
+
 ## Findings
 
 ### 1. In a batch, one drawing can steal the next one's answer
