@@ -94,7 +94,7 @@ const stateMany = (n: number) => `${n} quick doodles from a drawing game, images
 // (cat 63%, fox 15%, dog 10%) reads as a confident 85%, while scribbles stay near 0.
 export const METER_TEMPERATURE = 0.7
 
-/** Judges up to 4 doodles of the same prompt in one Clef request (batching measured fine, and cheaper per image). */
+/** Judges doodles of the same prompt in one Clef request. Rooms send one at a time (see BATCH_SIZE in room.ts); the lab still batches. */
 export async function judgeBatch(
   ai: Ai,
   model: ClefModel,

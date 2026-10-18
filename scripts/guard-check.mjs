@@ -8,7 +8,8 @@ import { DRAWINGS } from './lab-drawings.mjs'
 
 const [mode = 'play', base = 'http://localhost:3000', ...rest] = process.argv.slice(2)
 const PLAYERS = 8
-const BATCH = 4
+/** Drawings per Clef request: rooms judge each drawing on its own. */
+const BATCH = 1
 /** Words bot 0 can actually draw, from the lab sketches. */
 const SKETCHES = { cat: 'cat_4_whiskers', house: 'house', sun: 'sun', fish: 'fish', giraffe: 'giraffe', pizza: 'pizza', umbrella: 'umbrella' }
 const t0 = Date.now()

@@ -45,8 +45,13 @@ import type { Judgement } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
 
 const MODEL = 'clef'
-/** Each tick judges every changed canvas the shared budget allows, up to 4 per Clef request. */
-const BATCH_SIZE = 4
+/**
+ * Each tick judges every changed canvas the shared budget allows, one per
+ * Clef request. Batching four was 20% cheaper per drawing, but Clef could carry
+ * one image's answer into the next: an astronaut judged right after a snowman
+ * scored 12% instead of 95% (docs/clef-research.md).
+ */
+const BATCH_SIZE = 1
 /** Rooms nobody is connected to are wiped after this long. */
 const IDLE_CLEANUP_MS = 30 * 60_000
 /** At time-up, how long to wait for in-flight judgements before scoring. */
