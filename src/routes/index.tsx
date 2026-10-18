@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { ArrowRight, CircleNotch, PencilSimpleLine, Plus, Timer, UsersThree, WarningCircle } from '@phosphor-icons/react'
+import { ArrowRight, CircleNotch, GithubLogo, PencilSimpleLine, Plus, Timer, UsersThree, WarningCircle } from '@phosphor-icons/react'
 import { NameField, PosterSplit, Wordmark } from '#/components/Poster'
 import { loadIdentity, saveIdentity } from '#/lib/identity'
 import { randomName } from '#/lib/names'
@@ -56,6 +56,16 @@ function Home() {
 
   return (
     <PosterSplit
+      corner={
+        <a
+          href="https://github.com/bimsina/doodleblaze"
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-glass px-4 py-2 text-sm"
+        >
+          <GithubLogo className="size-5" weight="fill" /> GitHub
+        </a>
+      }
       hero={
         <div className="animate-rise">
           <Wordmark />

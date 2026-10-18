@@ -51,13 +51,25 @@ export function Body({ className = '', children }: { className?: string; childre
  * Home and invite pages: the orange poster with the big wordmark, and a white
  * panel for the form. Stacks on phones, sits side by side on wide screens.
  */
-export function PosterSplit({ hero, children }: { hero: React.ReactNode; children: React.ReactNode }) {
+export function PosterSplit({
+  hero,
+  corner,
+  children,
+}: {
+  hero: React.ReactNode
+  /** Sits opposite the mark, in the poster's top row. */
+  corner?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
     <main className="flex min-h-dvh flex-col lg:grid lg:grid-cols-[1.15fr_1fr]">
       <section className="flex flex-1 flex-col bg-blaze px-6 pt-6 pb-14 text-white sm:px-12 lg:p-14 lg:pb-14">
-        <Link to="/" aria-label="Doodleblaze home" className="w-fit transition-transform hover:-rotate-6">
-          <Mark className="size-10" />
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link to="/" aria-label="Doodleblaze home" className="w-fit transition-transform hover:-rotate-6">
+            <Mark className="size-10" />
+          </Link>
+          {corner}
+        </div>
         <div className="flex flex-1 flex-col justify-center py-10 lg:py-0">{hero}</div>
       </section>
       <section className="-mt-8 rounded-t-[2rem] bg-white px-6 pt-8 pb-10 sm:px-12 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:rounded-none lg:p-14">
