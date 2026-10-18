@@ -68,6 +68,13 @@ const VERDICT_WORDS = 40
  */
 const MESSAGES_PER_SECOND = 20
 const MESSAGE_BURST = 60
+/**
+ * A closed socket keeps delivering (and billing) messages until its client
+ * answers the close; one that never does is only dropped by Cloudflare a
+ * minute or so later. Past this many, the room resets itself to cut it off.
+ * A browser answers at once, so only a stroke or two is ever in flight.
+ */
+const AFTER_CLOSE_LIMIT = 20
 
 type Player = {
   id: string
@@ -135,8 +142,8 @@ export class Room extends DurableObject<Env> {
   private keepAlive: ReturnType<typeof setTimeout> | null = null
   /** Dev only (LAB_ENABLED): the next round's word. */
   private forcedWord: string | null = null
-  /** Each socket's message allowance (see MESSAGES_PER_SECOND). */
-  private allowance = new WeakMap<WebSocket, { tokens: number; at: number }>()
+  /** Each socket's message allowance (see MESSAGES_PER_SECOND), and what it sent after being closed. */
+  private allowance = new WeakMap<WebSocket, { tokens: number; at: number; afterClose: number }>()
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -226,7 +233,7 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
-    if (ws.readyState !== WebSocket.OPEN) return
+    if (ws.readyState !== WebSocket.OPEN) return this.sentAfterClose(ws)
     if (this.tooFast(ws)) return ws.close(4008, 'too_fast')
     const state = this.state
     if (!state || typeof raw !== 'string' || raw.length > 64_000) return
@@ -733,11 +740,23 @@ export class Room extends DurableObject<Env> {
   /** Spends one of the socket's messages. True once it has sent more than its allowance. */
   private tooFast(ws: WebSocket) {
     const now = Date.now()
-    const a = this.allowance.get(ws) ?? { tokens: MESSAGE_BURST, at: now }
+    const a = this.allowance.get(ws) ?? { tokens: MESSAGE_BURST, at: now, afterClose: 0 }
     a.tokens = Math.min(MESSAGE_BURST, a.tokens + ((now - a.at) / 1000) * MESSAGES_PER_SECOND) - 1
     a.at = now
     this.allowance.set(ws, a)
     return a.tokens < 0
+  }
+
+  /**
+   * Counts a message from a socket that was already closed, and past
+   * AFTER_CLOSE_LIMIT resets the room, which drops it. Everyone else
+   * reconnects and resends their strokes; the game itself is in storage.
+   */
+  private sentAfterClose(ws: WebSocket) {
+    const a = this.allowance.get(ws) ?? { tokens: 0, at: Date.now(), afterClose: 0 }
+    a.afterClose += 1
+    this.allowance.set(ws, a)
+    if (a.afterClose > AFTER_CLOSE_LIMIT) this.ctx.abort('socket kept sending after it was closed')
   }
 
   private isHost(player: Player) {

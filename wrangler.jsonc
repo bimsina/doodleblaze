@@ -47,7 +47,7 @@
 			"name": "ROOM_JOIN_LIMIT",
 			"namespace_id": "7302",
 			"simple": {
-				"limit": 30,
+				"limit": 12,
 				"period": 60
 			}
 		}

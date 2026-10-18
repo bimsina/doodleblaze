@@ -1,11 +1,17 @@
 // Checks the cost guards against a running server with bot players.
 // Usage: node scripts/guard-check.mjs <mode> [base] [...]
 //   create [base]                    POSTs 8 rooms in a row; expect 429 after 5 (per IP, per location)
-//   join   [base]                    opens 35 room sockets in a row; expect the 31st on to be refused (per IP, per location)
+//   join   [base]                    opens 35 room sockets in a row; expect the 13th on to be refused (per IP, per location)
 //   flood  [base]                    one socket sends messages as fast as it can; expect the room to close it with 4008
+//   ignore-close [base] [seconds]    a raw socket floods and never answers the close; expect the room to reset and drop it
+//                                    within a second, and a second player in the room to reconnect
 //   play   [base]                    one full room of 8 bots plays a round through to the reveal
 //   load   [base] [rooms] [seconds]  several full rooms draw at once; judging should slow to fit the budget
-// base defaults to http://localhost:3000. Every judgement is real (billed) inference; join and flood judge nothing.
+// base defaults to http://localhost:3000. Every judgement is real (billed) inference; join, flood and ignore-close judge nothing.
+// ignore-close needs production: local dev never hands the room messages from a closed socket.
+import net from 'node:net'
+import tls from 'node:tls'
+import { randomBytes } from 'node:crypto'
 import { DRAWINGS } from './lab-drawings.mjs'
 
 const [mode = 'play', base = 'http://localhost:3000', ...rest] = process.argv.slice(2)
@@ -115,6 +121,104 @@ if (mode === 'create') {
     const { status, body } = await createRoom()
     console.log(`${ts()} create #${k}: ${status} ${body.code ?? body.error}`)
   }
+} else if (mode === 'ignore-close') {
+  const seconds = Number(rest[0] ?? 90)
+  const { status, body } = await createRoom()
+  if (!body.code) throw new Error(`create failed: ${status} ${body.error}`)
+  const url = new URL(`/api/rooms/${body.code}/ws`, base)
+  const params = () => new URLSearchParams({ pid: crypto.randomUUID(), tok: crypto.randomUUID(), name: 'Guard' })
+  console.log(`${ts()} room ${body.code}`)
+
+  // A well-behaved second player, to see what the reset does to everyone else.
+  const bystanderParams = params()
+  let bystanderGone = 0
+  const bystander = (again) =>
+    new Promise((resolve, reject) => {
+      const ws = new WebSocket(`${url.href.replace(/^http/, 'ws')}?${bystanderParams}`)
+      let open = false
+      ws.onopen = () => {
+        open = true
+        if (again) console.log(`${ts()} bystander back after ${((Date.now() - bystanderGone) / 1000).toFixed(1)}s`)
+        resolve()
+      }
+      ws.onclose = (ev) => {
+        if (!open) return reject(new Error(`bystander could not connect (${ev.code}); rate limited? wait a minute`))
+        if (again) return
+        bystanderGone = Date.now()
+        console.log(`${ts()} bystander disconnected (${ev.code}), reconnecting`)
+        setTimeout(() => bystander(true).catch((err) => console.log(`${ts()} ${err.message}`)), 500)
+      }
+    })
+  await bystander(false)
+
+  // The stubborn socket: hand-rolled frames, so nothing answers the close for it.
+  const secure = url.protocol === 'https:'
+  const port = Number(url.port || (secure ? 443 : 80))
+  const sock = secure ? tls.connect({ host: url.hostname, port, servername: url.hostname }) : net.connect({ host: url.hostname, port })
+  const frame = (text) => {
+    const payload = Buffer.from(text)
+    const mask = randomBytes(4)
+    return Buffer.concat([Buffer.from([0x81, 0x80 | payload.length]), mask, payload.map((b, i) => b ^ mask[i % 4])])
+  }
+  let sent = 0
+  let closedAt = 0
+  let sentAtClose = 0
+  let timer
+  await new Promise((resolve) => {
+    let upgraded = false
+    let buf = Buffer.alloc(0)
+    let finished = false
+    const done = (why) => {
+      if (finished) return
+      finished = true
+      clearInterval(timer)
+      const after = closedAt ? `${((Date.now() - closedAt) / 1000).toFixed(1)}s after the close, ${sent - sentAtClose} sent since` : 'no close frame'
+      console.log(`${ts()} stubborn socket ${why}: ${after}`)
+      sock.destroy()
+      resolve()
+    }
+    sock.on(secure ? 'secureConnect' : 'connect', () =>
+      sock.write(
+        `GET ${url.pathname}?${params()} HTTP/1.1\r\nHost: ${url.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n` +
+          `Sec-WebSocket-Key: ${randomBytes(16).toString('base64')}\r\nSec-WebSocket-Version: 13\r\n\r\n`,
+      ),
+    )
+    sock.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk])
+      if (!upgraded) {
+        const end = buf.indexOf('\r\n\r\n')
+        if (end < 0) return
+        if (!buf.subarray(0, end).includes(' 101 ')) return done('was refused')
+        upgraded = true
+        buf = buf.subarray(end + 4)
+        // Undo in the lobby does nothing, so no Clef calls; 200 a second, never answering the close.
+        timer = setInterval(() => {
+          sock.write(frame('{"t":"undo"}'))
+          sent++
+          if (Date.now() - t0 > seconds * 1000) done('still connected')
+        }, 5)
+      }
+      // Server frames: opcode, then a 7-bit, 16-bit or 64-bit length, unmasked.
+      while (buf.length >= 2) {
+        let len = buf[1] & 0x7f
+        let off = 2
+        if (len === 126) [len, off] = buf.length >= 4 ? [buf.readUInt16BE(2), 4] : [Infinity, 0]
+        else if (len === 127) [len, off] = buf.length >= 10 ? [Number(buf.readBigUInt64BE(2)), 10] : [Infinity, 0]
+        if (buf.length < off + len) return
+        if ((buf[0] & 0x0f) === 0x8 && !closedAt) {
+          closedAt = Date.now()
+          sentAtClose = sent
+          console.log(`${ts()} stubborn socket got close ${len >= 2 ? buf.readUInt16BE(off) : ''} after ${sent} sent; ignoring it`)
+        }
+        buf = buf.subarray(off + len)
+      }
+    })
+    sock.on('end', () => done('was dropped'))
+    sock.on('close', () => done('was dropped'))
+    sock.on('error', (err) => done(`errored (${err.code ?? err.message})`))
+  })
+  await new Promise((r) => setTimeout(r, 3_000))
+  process.exit(0)
 } else if (mode === 'join' || mode === 'flood') {
   const { status, body } = await createRoom()
   if (!body.code) throw new Error(`create failed: ${status} ${body.error}`)
