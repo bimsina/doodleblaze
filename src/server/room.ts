@@ -39,7 +39,7 @@ import {
   VOCABULARY,
 } from '#/shared/prompts'
 import type { PromptWord } from '#/shared/prompts'
-import { BASE_TICK_MS, isResting, takeBudget } from '#/server/budget'
+import { BASE_TICK_MS, CLOSED, isKilled, isResting, takeBudget } from '#/server/budget'
 import { judgeBatch, optionsFor, verdict } from '#/server/judge'
 import type { Judgement } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
@@ -62,6 +62,12 @@ const MIN_CONSOLATION_METER = 0.1
 const LONG_STROKE_MS = 1_500
 /** Words a "something else" drawing is compared against at the reveal. Cost grows with the list. */
 const VERDICT_WORDS = 40
+/**
+ * Every incoming message is billed, even ones the room ignores, so a socket
+ * sending faster than this is closed. A drawing tab sends about 4 a second.
+ */
+const MESSAGES_PER_SECOND = 20
+const MESSAGE_BURST = 60
 
 type Player = {
   id: string
@@ -129,6 +135,8 @@ export class Room extends DurableObject<Env> {
   private keepAlive: ReturnType<typeof setTimeout> | null = null
   /** Dev only (LAB_ENABLED): the next round's word. */
   private forcedWord: string | null = null
+  /** Each socket's message allowance (see MESSAGES_PER_SECOND). */
+  private allowance = new WeakMap<WebSocket, { tokens: number; at: number }>()
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
@@ -218,6 +226,8 @@ export class Room extends DurableObject<Env> {
   }
 
   async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+    if (ws.readyState !== WebSocket.OPEN) return
+    if (this.tooFast(ws)) return ws.close(4008, 'too_fast')
     const state = this.state
     if (!state || typeof raw !== 'string' || raw.length > 64_000) return
     const { playerId } = ws.deserializeAttachment() as Attachment
@@ -300,6 +310,7 @@ export class Room extends DurableObject<Env> {
   async alarm() {
     const state = this.state
     if (!state) return
+    if (await isKilled(this.env)) return this.shutDown()
     const now = Date.now()
     if (state.endsAt && now < state.endsAt - 50) {
       await this.ctx.storage.setAlarm(state.endsAt)
@@ -453,6 +464,26 @@ export class Room extends DurableObject<Env> {
       }),
     )
     if (this.state?.result?.round === round) await this.save()
+  }
+
+  /** The kill switch: tell everyone, close every socket and wipe the room. Running games stop at their next phase change. */
+  private async shutDown() {
+    if (this.judgeTimer) clearTimeout(this.judgeTimer)
+    if (this.keepAlive) clearTimeout(this.keepAlive)
+    this.judgeTimer = null
+    this.keepAlive = null
+    this.finalizing = true
+    for (const ws of this.ctx.getWebSockets()) {
+      send(ws, { t: 'error', code: 'closed', message: CLOSED })
+      try {
+        ws.close(4000, 'closed')
+      } catch {
+        // Already closing.
+      }
+    }
+    this.state = null
+    this.canvases.clear()
+    await this.ctx.storage.deleteAll()
   }
 
   private async finishGame() {
@@ -698,6 +729,16 @@ export class Room extends DurableObject<Env> {
   }
 
   // --- Helpers ---
+
+  /** Spends one of the socket's messages. True once it has sent more than its allowance. */
+  private tooFast(ws: WebSocket) {
+    const now = Date.now()
+    const a = this.allowance.get(ws) ?? { tokens: MESSAGE_BURST, at: now }
+    a.tokens = Math.min(MESSAGE_BURST, a.tokens + ((now - a.at) / 1000) * MESSAGES_PER_SECOND) - 1
+    a.at = now
+    this.allowance.set(ws, a)
+    return a.tokens < 0
+  }
 
   private isHost(player: Player) {
     const state = this.state!

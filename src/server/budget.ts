@@ -31,8 +31,9 @@ export class JudgeBudget extends DurableObject<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env)
-    this.perSecond = Number(env.JUDGE_PER_MINUTE) / 60
-    this.perDay = Number(env.JUDGE_PER_DAY)
+    // A typo here would quietly lift the caps. Throwing makes every room see the budget as unreachable, which pauses play.
+    this.perSecond = positive(env.JUDGE_PER_MINUTE, 'JUDGE_PER_MINUTE') / 60
+    this.perDay = positive(env.JUDGE_PER_DAY, 'JUDGE_PER_DAY')
     ctx.blockConcurrencyWhile(async () => {
       this.daily = (await ctx.storage.get<Daily>('daily')) ?? this.daily
     })
@@ -90,25 +91,48 @@ export class JudgeBudget extends DurableObject<Env> {
   }
 }
 
+function positive(raw: string, name: string) {
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n <= 0) throw new Error(`${name} must be a positive number, not ${JSON.stringify(raw)}`)
+  return n
+}
+
 const budget = (env: Env) => env.BUDGET.getByName('global')
 
-/** Asks the shared budget for Clef requests. If it can't be reached, judge anyway at a gentler pace; the AI Gateway's own limits still apply. */
+/**
+ * Asks the shared budget for Clef requests. If it can't be reached, live
+ * checks stop until it answers again; only forced ones (the time-up look and
+ * reveal verdicts, a handful a round) still go out, so rounds can end.
+ */
 export async function takeBudget(env: Env, want: number, tickMs: number, force = false): Promise<Grant> {
   try {
     return await budget(env).take(want, tickMs, force)
   } catch (err) {
     console.error('budget check failed', err)
-    return { granted: want, tickMs: BASE_TICK_MS * 2 }
+    return { granted: force ? want : 0, tickMs: MAX_TICK_MS }
   }
 }
 
-/** The pause switch: the "paused" flag in KV (flipped by hand) or today's budget running out. */
+/** The pause switch: the "paused" flag in KV (flipped by hand) or today's budget running out. If either can't be read, play pauses too. */
 export async function isResting(env: Env): Promise<boolean> {
   try {
     const [flag, spent] = await Promise.all([env.FLAGS.get('paused', { cacheTtl: 30 }), budget(env).resting()])
     return (!!flag && flag !== '0') || spent
   } catch (err) {
     console.error('pause check failed', err)
+    return true
+  }
+}
+
+export const CLOSED = 'Doodleblaze is taking a short break. Come back a little later!'
+
+/** The kill switch: the "kill" flag in KV (flipped by hand) turns away every room request and closes running rooms. */
+export async function isKilled(env: Env): Promise<boolean> {
+  try {
+    const flag = await env.FLAGS.get('kill', { cacheTtl: 30 })
+    return !!flag && flag !== '0'
+  } catch (err) {
+    console.error('kill check failed', err)
     return false
   }
 }

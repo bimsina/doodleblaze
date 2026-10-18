@@ -1,8 +1,8 @@
 import { env } from 'cloudflare:workers'
 import handler from '@tanstack/react-start/server-entry'
 import { findWord, VOCABULARY } from '#/shared/prompts'
-import type { Stroke } from '#/shared/protocol'
-import { budgetStatus, isResting } from '#/server/budget'
+import type { ServerMessage, Stroke } from '#/shared/protocol'
+import { budgetStatus, CLOSED, isKilled, isResting } from '#/server/budget'
 import { clefProvider, judgeBatch, judgeMode, optionsFor, verdict } from '#/server/judge'
 import type { ClefModel } from '#/server/judge'
 import { renderStrokes } from '#/server/raster'
@@ -18,13 +18,19 @@ const CODE_RE = new RegExp(`^[${CODE_ALPHABET}]{${CODE_LENGTH}}$`)
 export default {
   async fetch(request: Request) {
     const url = new URL(request.url)
+    if (url.pathname.startsWith('/api/rooms') && (await isKilled(env))) return closed(request)
     if (url.pathname === '/api/rooms' && request.method === 'POST') return createRoom(request)
     const room = url.pathname.match(/^\/api\/rooms\/([A-Za-z]+)(\/ws)?$/)
     if (room) {
       const code = room[1].toUpperCase()
       if (!CODE_RE.test(code)) return Response.json({ exists: false }, { status: 404 })
       const stub = env.ROOMS.getByName(code)
-      if (room[2]) return stub.fetch(request)
+      if (room[2]) {
+        if (!(await env.ROOM_JOIN_LIMIT.limit({ key: ipOf(request) })).success) {
+          return new Response('Too many connections', { status: 429 })
+        }
+        return stub.fetch(request)
+      }
       return Response.json(await stub.info())
     }
     if (url.pathname.startsWith('/api/lab/')) return lab(request, url)
@@ -32,9 +38,20 @@ export default {
   },
 }
 
+const ipOf = (request: Request) => request.headers.get('cf-connecting-ip') ?? 'unknown'
+
+/** The kill switch is on: turn the request away without waking a room. A socket gets the reason, so the page stops reconnecting. */
+function closed(request: Request) {
+  if (request.headers.get('Upgrade') !== 'websocket') return Response.json({ exists: false, error: CLOSED }, { status: 503 })
+  const [client, server] = Object.values(new WebSocketPair())
+  server.accept()
+  server.send(JSON.stringify({ t: 'error', code: 'closed', message: CLOSED } satisfies ServerMessage))
+  server.close(4000, 'closed')
+  return new Response(null, { status: 101, webSocket: client })
+}
+
 async function createRoom(request: Request) {
-  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown'
-  if (!(await env.ROOM_CREATE_LIMIT.limit({ key: ip })).success) {
+  if (!(await env.ROOM_CREATE_LIMIT.limit({ key: ipOf(request) })).success) {
     return Response.json({ error: 'That’s a lot of rooms! Take a breather and try again in a minute.' }, { status: 429 })
   }
   if (await isResting(env)) {

@@ -95,4 +95,5 @@ export type ServerMessage =
   | { t: 'verdict'; round: number; playerId: string; label: string; p: number }
   /** Drishti is taking a break (daily budget spent or paused by hand), so no new games start. */
   | { t: 'resting' }
-  | { t: 'error'; code: 'not_found' | 'full' | 'bad_token' | 'bad_request'; message: string }
+  /** `closed`: the kill switch is on. */
+  | { t: 'error'; code: 'not_found' | 'full' | 'bad_token' | 'bad_request' | 'closed'; message: string }

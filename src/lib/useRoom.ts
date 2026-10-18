@@ -20,7 +20,7 @@ export type RoomConnection = {
   now: () => number
 }
 
-const FATAL = new Set(['not_found', 'full', 'bad_token', 'bad_request'])
+const FATAL = new Set(['not_found', 'full', 'bad_token', 'bad_request', 'closed'])
 
 export function useRoom(code: string, identity: Identity | null): RoomConnection {
   const [status, setStatus] = useState<RoomConnection['status']>('connecting')

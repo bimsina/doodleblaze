@@ -1,9 +1,11 @@
 // Checks the cost guards against a running server with bot players.
 // Usage: node scripts/guard-check.mjs <mode> [base] [...]
 //   create [base]                    POSTs 8 rooms in a row; expect 429 after 5 (per IP, per location)
+//   join   [base]                    opens 35 room sockets in a row; expect the 31st on to be refused (per IP, per location)
+//   flood  [base]                    one socket sends messages as fast as it can; expect the room to close it with 4008
 //   play   [base]                    one full room of 8 bots plays a round through to the reveal
 //   load   [base] [rooms] [seconds]  several full rooms draw at once; judging should slow to fit the budget
-// base defaults to http://localhost:3000. Every judgement is real (billed) inference.
+// base defaults to http://localhost:3000. Every judgement is real (billed) inference; join and flood judge nothing.
 import { DRAWINGS } from './lab-drawings.mjs'
 
 const [mode = 'play', base = 'http://localhost:3000', ...rest] = process.argv.slice(2)
@@ -112,6 +114,37 @@ if (mode === 'create') {
   for (let k = 1; k <= 8; k++) {
     const { status, body } = await createRoom()
     console.log(`${ts()} create #${k}: ${status} ${body.code ?? body.error}`)
+  }
+} else if (mode === 'join' || mode === 'flood') {
+  const { status, body } = await createRoom()
+  if (!body.code) throw new Error(`create failed: ${status} ${body.error}`)
+  const socket = () => {
+    const params = new URLSearchParams({ pid: crypto.randomUUID(), tok: crypto.randomUUID(), name: 'Guard' })
+    return new WebSocket(`${base.replace(/^http/, 'ws')}/api/rooms/${body.code}/ws?${params}`)
+  }
+  if (mode === 'join') {
+    let opened = 0
+    let refused = 0
+    for (let k = 0; k < 35; k++) {
+      const ws = socket()
+      const ok = await new Promise((r) => ((ws.onopen = () => r(true)), (ws.onerror = () => r(false))))
+      ws.close()
+      ok ? opened++ : refused++
+    }
+    console.log(`${ts()} room ${body.code}: ${opened} sockets opened, ${refused} refused`)
+  } else {
+    // Undo in the lobby does nothing, so no Clef calls; each message is still billed.
+    const ws = socket()
+    await new Promise((r) => (ws.onopen = r))
+    const closedWith = new Promise((r) => (ws.onclose = (ev) => r(ev.code)))
+    let sent = 0
+    const timer = setInterval(() => {
+      for (let k = 0; k < 20 && ws.readyState === WebSocket.OPEN; k++, sent++) ws.send('{"t":"undo"}')
+    }, 5)
+    const code = await Promise.race([closedWith, new Promise((r) => setTimeout(() => r('none, still open after 5s'), 5_000))])
+    clearInterval(timer)
+    ws.close()
+    console.log(`${ts()} room ${body.code}: sent ${sent} messages, close code ${code}${code === 4008 ? ' (too fast)' : ''}`)
   }
 } else if (mode === 'play') {
   const { status, body } = await createRoom()

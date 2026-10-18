@@ -18,15 +18,16 @@
 		"AI_GATEWAY": "doodleblaze",
 		// Clef requests shared by all rooms. Workers AI allows 300 a minute per account.
 		"JUDGE_PER_MINUTE": "240",
-		// About $0.70 a day at most (a 4-drawing check is ~$0.00023). Past this, new games pause until midnight UTC.
-		"JUDGE_PER_DAY": "10000",
+		// The gateway logs $0.00007–0.00023 a request, so this stays under its $1/day spend limit:
+		// new games pause with the "resting" note before the gateway starts refusing. Resets at midnight UTC.
+		"JUDGE_PER_DAY": "2500",
 		// "live" calls Clef. "mock" makes up judgements for free (no API calls); .env.local sets it for local dev.
 		"JUDGE_MODE": "live",
 		"CLEF_PROVIDER": "cloudflare"
 	},
 	"kv_namespaces": [
 		{
-			// Put "paused" = "1" here to pause new games by hand.
+			// Put "paused" = "1" here to pause new games by hand, or "kill" = "1" to close every room.
 			"binding": "FLAGS",
 			"id": "b96cf95168a64c3aafcf9b59634513df"
 		}
@@ -38,6 +39,15 @@
 			"namespace_id": "7301",
 			"simple": {
 				"limit": 5,
+				"period": 60
+			}
+		},
+		{
+			// Room sockets opened per IP, per Cloudflare location. Every (re)connect is billed; a full room on one Wi-Fi is 8.
+			"name": "ROOM_JOIN_LIMIT",
+			"namespace_id": "7302",
+			"simple": {
+				"limit": 30,
 				"period": 60
 			}
 		}
@@ -65,7 +75,9 @@
 		}
 	},
 	"observability": {
-		"enabled": true
+		"enabled": true,
+		// Every incoming WebSocket message is a log event (a drawing tab sends ~4 a second), so keep a 10% sample.
+		"head_sampling_rate": 0.1
 	},
 	"upload_source_maps": true,
 	"workers_dev": false,

@@ -45,10 +45,10 @@ function Home() {
     if (clean.length !== 5) return setError('Room codes are 5 letters.')
     setBusy(true)
     setError(null)
-    const info = await fetch(`/api/rooms/${clean}`).then((r) => r.json<{ exists: boolean }>())
+    const info = await fetch(`/api/rooms/${clean}`).then((r) => r.json<{ exists: boolean; error?: string }>())
     if (!info.exists) {
       setBusy(false)
-      return setError('No room with that code. Check it and try again.')
+      return setError(info.error ?? 'No room with that code. Check it and try again.')
     }
     rememberName()
     await navigate({ to: '/r/$code', params: { code: clean } })
