@@ -3,6 +3,7 @@ import {
   Bicycle,
   Cards,
   Check,
+  CookingPot,
   Crown,
   FishSimple,
   Ghost,
@@ -12,6 +13,7 @@ import {
   Lamp,
   LinkSimple,
   MagicWand,
+  MaskHappy,
   MusicNotes,
   NotePencil,
   PawPrint,
@@ -56,6 +58,8 @@ const PACK_ICONS: Record<string, Icon | undefined> = {
   spooky: Ghost,
   body: HandWaving,
   tools: Wrench,
+  characters: MaskHappy,
+  kitchen: CookingPot,
 }
 
 /** The host's last list, kept on this device so the next room starts with it. */
@@ -121,7 +125,7 @@ export function Lobby({ room }: { room: RoomConnection }) {
               {isHost ? 'you pick' : 'the host picks'}
             </span>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             {PACKS.map((pack) => (
               <PackCard
                 key={pack.id}
@@ -232,7 +236,7 @@ function PackCard({
         />
       </span>
       <span className="leading-tight font-bold">{name}</span>
-      {/* Sixteen cards are a lot on a phone: there, only the picked pack shows its line. */}
+      {/* Eighteen cards are a lot on a phone: there, only the picked pack shows its line. */}
       <span
         className={`mt-0.5 text-sm leading-snug ${selected ? 'text-white/65' : 'hidden text-ink-faint sm:block'}`}
       >

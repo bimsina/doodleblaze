@@ -452,6 +452,45 @@ const TOOLS: PromptWord[] = [
   w('first aid kit', 'suitcase', 'box', 'handbag'),
 ]
 
+const CHARACTERS: PromptWord[] = [
+  w('pirate', 'cowboy', 'viking', 'sailor'),
+  w('ninja', 'burglar', 'cowboy', 'scarecrow'),
+  w('chef', 'doctor', 'painter', 'snowman'),
+  w('clown', 'jester', 'scarecrow', 'king'),
+  w('king', 'queen', 'knight', 'wizard'),
+  w('queen', 'king', 'bride', 'fairy'),
+  w('knight', 'robot', 'astronaut', 'soldier'),
+  w('wizard', 'witch', 'king', 'gnome'),
+  w('witch', 'wizard', 'scarecrow', 'ghost'),
+  w('superhero', 'vampire', 'ninja', 'robot'),
+  w('firefighter', 'astronaut', 'police officer', 'miner'),
+  w('doctor', 'chef', 'scientist', 'nurse'),
+  w('scientist', 'doctor', 'chef', 'wizard'),
+  w('magician', 'wizard', 'vampire', 'king'),
+  w('ballerina', 'fairy', 'princess', 'flower'),
+  w('viking', 'pirate', 'knight', 'caveman'),
+  w('zombie', 'mummy', 'scarecrow', 'robot'),
+]
+
+const KITCHEN: PromptWord[] = [
+  w('toaster', 'radio', 'suitcase', 'box'),
+  w('kettle', 'trophy', 'bucket', 'lamp'),
+  w('blender', 'vase', 'lighthouse', 'bottle'),
+  w('whisk', 'balloon', 'lightbulb', 'tennis racket'),
+  w('spatula', 'shovel', 'spoon', 'toothbrush'),
+  w('rolling pin', 'baseball bat', 'bone', 'paint roller'),
+  w('grater', 'trash can', 'skyscraper', 'lantern'),
+  w('oven mitt', 'hand puppet', 'sock', 'boxing glove'),
+  w('fridge', 'door', 'cupboard', 'mailbox'),
+  w('microwave', 'television', 'washing machine', 'radio'),
+  w('ladle', 'spoon', 'umbrella', 'golf club'),
+  w('colander', 'bowl', 'helmet', 'basket'),
+  w('salt shaker', 'bottle', 'lighthouse', 'thermos'),
+  w('chopsticks', 'pencils', 'drumsticks', 'straws'),
+  w('teacup', 'mug', 'bowl', 'flower pot'),
+  w('cookie jar', 'vase', 'lantern', 'bucket'),
+]
+
 const THEMED: Pack[] = [
   { id: 'animals', name: 'Animals', blurb: 'Necks, tails, too many legs', words: ANIMALS },
   { id: 'sea', name: 'Under the sea', blurb: 'Fins, shells, sandy toes', words: SEA },
@@ -467,6 +506,8 @@ const THEMED: Pack[] = [
   { id: 'spooky', name: 'Spooky', blurb: 'Things that go bump', words: SPOOKY },
   { id: 'body', name: 'Head to toe', blurb: 'Every bit of you, roughly', words: BODY },
   { id: 'tools', name: 'Tools of the trade', blurb: 'Builders, doctors, mad scientists', words: TOOLS },
+  { id: 'characters', name: 'Characters', blurb: 'Pirates, ninjas, the odd queen', words: CHARACTERS },
+  { id: 'kitchen', name: 'Kitchen', blurb: 'Whisk it, toast it, lose the lid', words: KITCHEN },
 ]
 
 // Mixed bag is every other pack together. Each word lives in exactly one pack.

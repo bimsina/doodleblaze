@@ -6,7 +6,7 @@ A multiplayer drawing race. Everyone draws the same word at once while Drishti, 
 
 Play it at **https://doodleblaze.bimsina.dev**.
 
-- **398 words in 14 packs**, from Animals to Sci-fi & space and Spooky, each [tested against the judge](docs/clef-research.md).
+- **431 words in 16 packs**, from Animals to Sci-fi & space and Characters, each [tested against the judge](docs/clef-research.md).
 - **Your own words:** the host can write a pack of 5 to 100 words for the room.
 - **Up to 8 players**, 5 rounds of 60 seconds, no sign-up.
 
