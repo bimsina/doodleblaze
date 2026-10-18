@@ -467,14 +467,18 @@ export default {
       }
       return curve(...pts)
     }
-    const chords = [-90, -55, -20, 15, 50, 85].map((d) => {
-      const h = Math.sqrt(125 * 125 - d * d)
-      const c = Math.SQRT1_2
-      return line([500 + d * c - h * c, 500 + d * c + h * c], [500 + d * c + h * c, 500 + d * c - h * c])
-    })
+    // Cross-hatched so the hole reads as dark.
+    const hatch = (deg) =>
+      [-80, -48, -16, 16, 48, 80].map((d) => {
+        const h = Math.sqrt(125 * 125 - d * d)
+        const a = (deg * Math.PI) / 180
+        const [ux, uy, nx, ny] = [Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a)]
+        return line([500 + nx * d - ux * h, 500 + ny * d - uy * h], [500 + nx * d + ux * h, 500 + ny * d + uy * h])
+      })
     return [
       circle(500, 500, 130),
-      ...chords,
+      ...hatch(45),
+      ...hatch(-45),
       circle(500, 500, 165),
       swirl(0),
       swirl((Math.PI * 2) / 3),

@@ -387,7 +387,9 @@ export default {
   ],
 
   barn: () => [
+    // gambrel roof with a trim line, on a farm fence
     line([150, 860], [150, 450], [250, 260], [500, 130], [750, 260], [850, 450], [850, 860], [150, 860]),
+    line([180, 450], [270, 290], [500, 170], [730, 290], [820, 450]),
     line([150, 450], [850, 450]),
     // big double doors with cross braces
     rect(320, 560, 360, 300),
@@ -400,6 +402,13 @@ export default {
     rect(430, 280, 140, 120),
     line([430, 280], [570, 400]),
     line([570, 280], [430, 400]),
+    // fence either side
+    ...[30, 90].map((x) => line([x, 860], [x, 700])),
+    ...[910, 970].map((x) => line([x, 860], [x, 700])),
+    line([10, 740], [150, 740]),
+    line([10, 800], [150, 800]),
+    line([850, 740], [990, 740]),
+    line([850, 800], [990, 800]),
   ],
 
   igloo: () => {
@@ -432,6 +441,11 @@ export default {
     }
     // entrance tunnel
     out.push(arc(500, base, 150, 170, 180, 360), arc(500, base, 90, 110, 180, 360))
+    // snowdrifts and falling snow
+    out.push(curve([20, base + 40], [200, base + 10], [400, base + 50], [600, base + 20], [800, base + 50], [980, base + 20]))
+    for (const [x, y] of [[120, 200], [250, 110], [800, 140], [900, 260], [150, 420], [860, 450]]) {
+      out.push(line([x - 18, y], [x + 18, y]), line([x - 10, y - 15], [x + 10, y + 15]), line([x + 10, y - 15], [x - 10, y + 15]))
+    }
     return out
   },
 

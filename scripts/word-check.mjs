@@ -2,11 +2,11 @@
 // scripts/doodles. Needs `pnpm dev` with LAB_ENABLED=1, JUDGE_MODE=live and
 // CLEF_PROVIDER=ollama in .env.local, so every check runs on a local Clef, free.
 //   node --import ./scripts/ts-hooks.mjs scripts/word-check.mjs <results.json> [pack id | word ...] [--redo]
-// Each word's doodle is judged twice: alone, and in one batch with doodles of
-// its look-alikes (or a scribble), like a busy round. Scores shift with the
-// company a drawing keeps, by 15 points or so. A word passes when its doodle
-// blazes both times and no look-alike's doodle does. Results are saved after
-// every word; a rerun skips words whose doodles haven't changed, unless --redo.
+// Judged the way rooms judge, one drawing per request: the word's own doodle,
+// then each look-alike's doodle (or a scribble, when a look-alike has none)
+// under the same question. A word passes when its doodle blazes and no
+// look-alike's does. Results are saved after every word; a rerun skips words
+// whose doodles and look-alikes haven't changed, unless --redo.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { PACKS } from '#/shared/prompts'
@@ -50,32 +50,29 @@ for (const prompt of words) {
   const same = prev?.key === key && (!prev.distractors || prev.distractors.join() === prompt.distractors.join())
   if (!redo && !picks.includes(prompt.word) && same) continue
 
-  const alone = await judge(prompt.word, [own])
-  const crowd = await judge(prompt.word, batch.map((b) => b.drawing))
-  if (!alone || !crowd) continue
-  const [solo] = alone.judgements
-  const [mine, ...rest] = crowd.judgements
+  const started = Date.now()
+  const runs = await Promise.all(batch.map((b) => judge(prompt.word, [b.drawing])))
+  if (runs.some((r) => !r)) continue
+  const [mine, ...rest] = runs.map((r) => r.judgements[0])
   const lookalikes = rest.map((j, i) => ({ word: others[i].label, meter: j.meter, top: j.top }))
   const falseBlaze = lookalikes.filter((l) => l.meter >= BLAZE_THRESHOLD)
-  const meter = Math.min(solo.meter, mine.meter)
-  const pass = meter >= BLAZE_THRESHOLD && falseBlaze.length === 0
+  const pass = mine.meter >= BLAZE_THRESHOLD && falseBlaze.length === 0
+  const ms = Date.now() - started
   results[prompt.word] = {
     pack: packOf.get(prompt.word),
     pass,
-    meter,
-    alone: solo.meter,
-    crowd: mine.meter,
-    top: solo.meter <= mine.meter ? solo.top : mine.top,
+    meter: mine.meter,
+    top: mine.top,
     lookalikes,
-    ms: alone.ms + crowd.ms,
+    ms,
     key,
     distractors: prompt.distractors,
   }
   writeFileSync(outFile, JSON.stringify(results, null, 1))
   console.log(
-    `${pass ? 'pass' : 'FAIL'} ${prompt.word.padEnd(18)} alone ${pct(solo.meter)}% (${solo.top})  crowd ${pct(mine.meter)}%  |  ${lookalikes
+    `${pass ? 'pass' : 'FAIL'} ${prompt.word.padEnd(18)} ${pct(mine.meter)}% (${mine.top})  |  ${lookalikes
       .map((l) => `${l.word} ${pct(l.meter)}${l.meter >= BLAZE_THRESHOLD ? '!' : ''}`)
-      .join(', ')}  ${alone.ms + crowd.ms} ms`,
+      .join(', ')}  ${ms} ms`,
   )
 }
 
@@ -102,7 +99,7 @@ const failed = words.filter((w) => results[w.word] && !results[w.word].pass)
 console.log(`\n${checked.length - failed.length}/${checked.length} pass (${words.length} words asked)`)
 for (const w of failed) {
   const r = results[w.word]
-  const why = r.meter < BLAZE_THRESHOLD ? `own doodle ${pct(r.alone)}% alone, ${pct(r.crowd)}% in a crowd (top: ${r.top})` : ''
+  const why = r.meter < BLAZE_THRESHOLD ? `own doodle ${pct(r.meter)}% (top: ${r.top})` : ''
   const fb = r.lookalikes.filter((l) => l.meter >= BLAZE_THRESHOLD).map((l) => `${l.word} blazed ${pct(l.meter)}%`)
   console.log(`  ${w.word}: ${[why, ...fb].filter(Boolean).join('; ')}`)
 }

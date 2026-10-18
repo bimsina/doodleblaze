@@ -382,21 +382,20 @@ export default {
   ],
 
   stopwatch: () => {
-    const c = [500, 590]
+    const c = [500, 600]
     const out = [circle(...c, 300), circle(...c, 255)]
-    // the winder on top with its ring, and one push button off to the side
-    out.push(rect(470, 245, 60, 48), rrect(420, 200, 160, 48, 18), ellipse(500, 165, 42, 36))
-    out.push(rotate([rect(482, 238, 36, 55), rrect(458, 205, 84, 38, 12)], 45, ...c))
+    // a big winder on top with its lanyard ring, and one push button off to the side
+    out.push(rect(465, 245, 70, 55), rrect(400, 190, 200, 60, 22), ellipse(500, 135, 60, 50))
+    out.push(rotate([rect(482, 245, 36, 55), rrect(455, 210, 90, 40, 12)], 45, ...c))
     for (let k = 0; k < 12; k++) {
       const a = -90 + k * 30
       out.push(line(polar(...c, k % 3 === 0 ? 200 : 225, a), polar(...c, 248, a)))
     }
     // one long sweep hand, with the time it has run shaded in
-    out.push(line(c, polar(...c, 225, -20)))
-    const wedge = [c, ...[-90, -75, -60, -45, -30, -20].map((a) => polar(...c, 190, a))]
+    out.push(line(c, polar(...c, 230, 10)))
+    const wedge = [c, ...[-90, -70, -50, -30, -10, 10].map((a) => polar(...c, 195, a))]
     out.push(...hatchPoly(wedge, 30, -20))
     out.push(dot(...c, 16))
-    out.push(circle(500, 720, 45), line([500, 720], [525, 690]))
     return out
   },
 
@@ -450,16 +449,17 @@ export default {
   },
 
   domino: () => {
-    // one long tile standing up: two square halves split by a line and a pin
-    const out = [rrect(330, 100, 340, 680, 40), line([350, 440], [650, 440]), line([350, 460], [650, 460]), dot(500, 450, 14)]
-    for (const x of [410, 590]) for (const y of [180, 270, 360]) out.push(...pip(x, y, 20))
+    // one tile lying down: two square halves split by a line and a pin
+    const out = [rrect(150, 320, 700, 360, 40), line([490, 340], [490, 660]), line([510, 340], [510, 660]), dot(500, 500, 14)]
+    for (const x of [240, 410]) for (const y of [400, 500, 600]) out.push(...pip(x, y, 20))
     for (const [x, y] of [
-      [410, 540],
-      [500, 620],
-      [590, 700],
+      [600, 410],
+      [760, 410],
+      [600, 590],
+      [760, 590],
     ])
       out.push(...pip(x, y, 20))
-    return rotate(out, 15, 500, 440)
+    return rotate(out, -12)
   },
 
   'chess knight': () => [
@@ -553,17 +553,20 @@ export default {
   ],
 
   'spinning top': () => [
-    rrect(470, 90, 60, 170, 20),
-    curve([480, 260], [330, 290], [200, 420]),
-    curve([520, 260], [670, 290], [800, 420]),
-    curve([200, 420], [300, 560], [430, 750], [500, 850]),
-    curve([800, 420], [700, 560], [570, 750], [500, 850]),
-    curve([200, 420], [500, 470], [800, 420]),
-    curve([250, 500], [500, 545], [750, 500]),
-    line([500, 850], [500, 905]),
-    line([380, 915], [620, 915]),
-    arc(500, 470, 380, 140, 150, 205),
-    arc(500, 470, 380, 140, -25, 30),
+    // a peg top: a knob, a flat painted crown, then a long straight cone to the point
+    rrect(470, 80, 60, 150, 20),
+    ellipse(500, 270, 210, 50),
+    line([290, 270], [290, 330]),
+    line([710, 270], [710, 330]),
+    curve([290, 330], [500, 380], [710, 330]),
+    line([290, 330], [500, 840]),
+    line([710, 330], [500, 840]),
+    curve([350, 470], [500, 505], [650, 470]),
+    curve([405, 600], [500, 625], [595, 600]),
+    line([500, 840], [500, 890]),
+    ellipse(500, 905, 100, 18),
+    arc(500, 400, 300, 120, 150, 210),
+    arc(500, 400, 300, 120, -30, 30),
   ],
 
   'rocking horse': () => [

@@ -411,30 +411,40 @@ export default {
   flashlight: () =>
     rotate(
       [
-        // body with a switch and grip rings
-        path(line([450, 430], [170, 430]), arc(170, 500, 50, 70, 270, 90), line([170, 570], [450, 570])),
-        rect(270, 405, 60, 25),
-        ...[200, 230].map((x) => line([x, 435], [x, 565])),
-        // flared head and lens
-        line([450, 430], [580, 370]),
-        line([450, 570], [580, 630]),
-        ellipse(580, 500, 35, 130),
-        // a cone of light
-        line([610, 380], [950, 220]),
-        line([610, 620], [950, 780]),
-        line([650, 450], [800, 420]),
-        line([660, 500], [820, 500]),
-        line([650, 550], [800, 580]),
+        // long body with a push button and grip rings
+        path(line([520, 440], [130, 440]), arc(130, 500, 35, 60, 270, 90), line([130, 560], [520, 560])),
+        rect(330, 415, 70, 25),
+        ...[190, 220, 250].map((x) => line([x, 445], [x, 555])),
+        // slightly wider head and its round glass
+        line([520, 440], [600, 410]),
+        line([520, 560], [600, 590]),
+        ellipse(600, 500, 28, 90),
+        // a wide beam of light
+        line([630, 420], [980, 260]),
+        line([630, 580], [980, 740]),
+        line([700, 455], [900, 400]),
+        line([710, 500], [930, 500]),
+        line([700, 545], [900, 600]),
       ],
-      -12,
+      -15,
     ),
 
   'magnifying glass': () => [
-    // thick rim, glint, chunky handle
-    circle(380, 380, 220),
-    circle(380, 380, 185),
-    arc(380, 380, 140, 140, 195, 255),
-    rotate([rect(600, 350, 60, 60), rounded(660, 340, 300, 80, 35)], 45, 380, 380),
+    // lens in a rim, two shine marks on the glass, short collar, ribbed handle
+    circle(380, 380, 230),
+    circle(380, 380, 200),
+    line([250, 330], [330, 250]),
+    line([270, 400], [400, 270]),
+    rotate(
+      [
+        shape([608, 345], [668, 330], [668, 430], [608, 415]),
+        rounded(668, 335, 290, 90, 42),
+        ...[740, 790, 840].map((x) => line([x, 340], [x, 420])),
+      ],
+      45,
+      380,
+      380,
+    ),
   ],
 
   microscope: () => [
